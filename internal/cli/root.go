@@ -176,6 +176,9 @@ See README.md or the bundled SKILL.md for recipes.`,
 		return nil
 	}
 	rootCmd.AddCommand(newPropertiesCmd(flags))
+	// Admin API: account/property discovery (read-only). Same token source as
+	// the Data API; just a different host (analyticsadmin.googleapis.com).
+	rootCmd.AddCommand(newAccountsCmd(flags))
 	// Hand-authored novel commands: URL-centric absorbed (pages), funnel,
 	// schema cache, saved templates, drift, realtime watch.
 	rootCmd.AddCommand(newPagesCmd(flags))

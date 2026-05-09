@@ -20,5 +20,9 @@ func newPropertiesCmd(flags *rootFlags) *cobra.Command {
 	cmd.AddCommand(newPropertiesRunPivotReportCmd(flags))
 	cmd.AddCommand(newPropertiesRunRealtimeReportCmd(flags))
 	cmd.AddCommand(newPropertiesRunReportCmd(flags))
+	// Admin API: full property metadata (display name, time zone, currency,
+	// account). Lives under properties for discoverability even though it
+	// talks to the analyticsadmin host.
+	cmd.AddCommand(newPropertiesDescribeCmd(flags))
 	return cmd
 }
