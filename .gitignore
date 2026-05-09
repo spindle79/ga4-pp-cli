@@ -1,0 +1,14 @@
+# Build artifacts
+/ga4-pp-cli
+/ga4-pp-mcp
+/build/
+/dist/
+
+# Verification artifacts (shipcheck/dogfood)
+dogfood-results.json
+workflow-verify-report.json
+phase5-acceptance.json
+phase5-skip.json
+
+# Local DB / config / cache
+/.data/

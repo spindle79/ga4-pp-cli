@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-05-09T16:40:17.238423Z",
+  "printing_press_version": "4.2.0",
+  "api_name": "ga4",
+  "display_name": "Google Analytics Data",
+  "cli_name": "ga4-pp-cli",
+  "owner": "spindle79",
+  "printer": "spindle79",
+  "printer_name": "Adam Harris",
+  "spec_path": "/Users/adamharris/printing-press/.runstate/clis-04d85ed0/runs/20260509-092529/research/ga4-data-openapi-v1beta.json",
+  "spec_format": "openapi3",
+  "spec_checksum": "sha256:b1a576a31965d45732593633fae04c061f682c659db61e3ec669953738396c3e",
+  "run_id": "20260509-092529",
+  "mcp_binary": "ga4-pp-mcp",
+  "mcp_tool_count": 7,
+  "mcp_ready": "full",
+  "api_version": "v1beta",
+  "auth_type": "bearer_token",
+  "auth_env_vars": [
+    "GOOGLE_ANALYTICS_DATA_OAUTH2C"
+  ],
+  "novel_features": [
+    {
+      "name": "Saved report profiles",
+      "command": "templates run",
+      "description": "Save GA4 report templates by name and re-run them with one command."
+    },
+    {
+      "name": "Drift / top-movers",
+      "command": "drift pages",
+      "description": "Show top page-level movers between two periods in one command."
+    },
+    {
+      "name": "Realtime watch loop",
+      "command": "watch realtime",
+      "description": "Poll runRealtimeReport on an interval and stream deltas as agent-friendly JSON."
+    },
+    {
+      "name": "FTS schema search",
+      "command": "schema search",
+      "description": "Find the right GA4 dimension or metric by phrase, including custom dimensions/metrics for the property."
+    },
+    {
+      "name": "Sampling / (other) / quota guard",
+      "command": "properties run-report",
+      "description": "Every report response auto-surfaces sampling, (other)-bucket overflow, and remaining quota tokens as structured warnings."
+    },
+    {
+      "name": "Compatibility batch",
+      "command": "templates compat",
+      "description": "Run checkCompatibility for every metric in a saved report profile, returning a dimension-vs-metric compatibility matrix."
+    }
+  ]
+}

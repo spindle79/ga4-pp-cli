@@ -1,0 +1,39 @@
+{
+  "manifest_version": "0.3",
+  "name": "ga4-pp-mcp",
+  "display_name": "Google Analytics Data",
+  "version": "4.2.0",
+  "description": "Google Analytics Data API surface as MCP tools.",
+  "author": {
+    "name": "CLI Printing Press"
+  },
+  "license": "Apache-2.0",
+  "server": {
+    "type": "binary",
+    "entry_point": "bin/ga4-pp-mcp",
+    "mcp_config": {
+      "command": "${__dirname}/bin/ga4-pp-mcp",
+      "args": [],
+      "env": {
+        "GOOGLE_ANALYTICS_DATA_OAUTH2C": "${user_config.google_analytics_data_oauth2c}"
+      }
+    }
+  },
+  "user_config": {
+    "google_analytics_data_oauth2c": {
+      "type": "string",
+      "title": "GOOGLE_ANALYTICS_DATA_OAUTH2C",
+      "description": "Sets GOOGLE_ANALYTICS_DATA_OAUTH2C for the Google Analytics Data MCP server.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": [
+      "darwin",
+      "linux",
+      "win32"
+    ]
+  }
+}
