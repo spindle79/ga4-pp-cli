@@ -138,22 +138,222 @@ stale (>6h) so cold-cache calls don't need a manual sync first.
   ga4-pp-cli top sources --metric total_users --agent
   ga4-pp-cli top events --period 28d --limit 5 --agent`,
 	}
-	for _, spec := range allTopSpecs() {
-		cmd.AddCommand(newTopSubCmd(flags, spec))
-	}
+	// Static AddCommand calls (one per spec) so the printing-press
+	// verify-skill AST walker can resolve `top <leaf>` to this file.
+	// A `for spec := range allTopSpecs()` loop builds the same tree at
+	// runtime but the verifier walks the rootCmd.AddCommand graph
+	// statically; it needs a named constructor per subcommand to bind
+	// the path. Each constructor below is a one-line wrapper around the
+	// shared newTopSubCmd factory.
+	cmd.AddCommand(newTopPagesCmd(flags))
+	cmd.AddCommand(newTopSourcesCmd(flags))
+	cmd.AddCommand(newTopEventsCmd(flags))
+	cmd.AddCommand(newTopCountriesCmd(flags))
+	cmd.AddCommand(newTopDevicesCmd(flags))
+	cmd.AddCommand(newTopCampaignsCmd(flags))
 	return cmd
 }
 
-// newTopSubCmd builds the cobra.Command for one spec. All six top-* share
-// the same RunE shape (resolve property, ensure freshness, build SQL, scan
-// rows, emit JSON or table) so the spec is the only thing that varies.
+// One-line constructors per subcommand. Each pulls its spec from the
+// canonical table so the metric whitelist / table / sync scope stays in
+// one place; the verify-skill walker still gets a stable function name to
+// resolve.
+
+func topSpecByUse(use string) topSpec {
+	for _, s := range allTopSpecs() {
+		if s.use == use {
+			return s
+		}
+	}
+	// Programmer error — every Use here has a corresponding spec.
+	panic(fmt.Sprintf("topSpecByUse: no spec for %q", use))
+}
+
+// Each per-leaf constructor below declares its own cobra.Command literal
+// with an explicit `Use: "<leaf>"` so the printing-press verify-skill
+// AST walker can resolve `top <leaf>` to a single file. RunE delegates
+// to topRunE so the actual logic stays in one place.
+
+func newTopPagesCmd(flags *rootFlags) *cobra.Command {
+	tf := &topFlags{}
+	spec := topSpecByUse("pages")
+	cmd := &cobra.Command{
+		Use:         "pages",
+		Short:       "Top performing pages by sessions (default) from pages_daily",
+		Example:     "  ga4-pp-cli top pages --period 7d --agent",
+		Annotations: map[string]string{"mcp:read-only": "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return topRunE(cmd, args, flags, tf, spec)
+		},
+	}
+	bindTopFlags(cmd, tf, spec)
+	return cmd
+}
+
+func newTopSourcesCmd(flags *rootFlags) *cobra.Command {
+	tf := &topFlags{}
+	spec := topSpecByUse("sources")
+	cmd := &cobra.Command{
+		Use:         "sources",
+		Aliases:     []string{"traffic-sources"},
+		Short:       "Top traffic sources by sessions from acquisition_daily",
+		Example:     "  ga4-pp-cli top sources --period 7d --agent",
+		Annotations: map[string]string{"mcp:read-only": "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return topRunE(cmd, args, flags, tf, spec)
+		},
+	}
+	bindTopFlags(cmd, tf, spec)
+	return cmd
+}
+
+func newTopEventsCmd(flags *rootFlags) *cobra.Command {
+	tf := &topFlags{}
+	spec := topSpecByUse("events")
+	cmd := &cobra.Command{
+		Use:         "events",
+		Short:       "Top events by event_count from events_daily",
+		Example:     "  ga4-pp-cli top events --period 7d --agent",
+		Annotations: map[string]string{"mcp:read-only": "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return topRunE(cmd, args, flags, tf, spec)
+		},
+	}
+	bindTopFlags(cmd, tf, spec)
+	return cmd
+}
+
+func newTopCountriesCmd(flags *rootFlags) *cobra.Command {
+	tf := &topFlags{}
+	spec := topSpecByUse("countries")
+	cmd := &cobra.Command{
+		Use:         "countries",
+		Aliases:     []string{"geo"},
+		Short:       "Top countries by sessions from devices_geo_daily",
+		Example:     "  ga4-pp-cli top countries --period 7d --agent",
+		Annotations: map[string]string{"mcp:read-only": "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return topRunE(cmd, args, flags, tf, spec)
+		},
+	}
+	bindTopFlags(cmd, tf, spec)
+	return cmd
+}
+
+func newTopDevicesCmd(flags *rootFlags) *cobra.Command {
+	tf := &topFlags{}
+	spec := topSpecByUse("devices")
+	cmd := &cobra.Command{
+		Use:         "devices",
+		Short:       "Top device categories by sessions from devices_geo_daily",
+		Example:     "  ga4-pp-cli top devices --period 7d --agent",
+		Annotations: map[string]string{"mcp:read-only": "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return topRunE(cmd, args, flags, tf, spec)
+		},
+	}
+	bindTopFlags(cmd, tf, spec)
+	return cmd
+}
+
+func newTopCampaignsCmd(flags *rootFlags) *cobra.Command {
+	tf := &topFlags{}
+	spec := topSpecByUse("campaigns")
+	cmd := &cobra.Command{
+		Use:         "campaigns",
+		Short:       "Top campaigns by sessions from acquisition_daily",
+		Example:     "  ga4-pp-cli top campaigns --period 7d --agent",
+		Annotations: map[string]string{"mcp:read-only": "true"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return topRunE(cmd, args, flags, tf, spec)
+		},
+	}
+	bindTopFlags(cmd, tf, spec)
+	return cmd
+}
+
+// topFlags is the shared flag bag bound by every per-leaf constructor and
+// read by topRunE. Keeping the values in a single struct lets each
+// constructor own its own cobra.Command literal (so verify-skill can see
+// the Use: line) while still sharing the actual run logic.
+type topFlags struct {
+	property string
+	metric   string
+	period   string
+	limit    int
+}
+
+// bindTopFlags wires --property/--metric/--period/--limit onto cmd.
+func bindTopFlags(cmd *cobra.Command, tf *topFlags, spec topSpec) {
+	cmd.Flags().StringVar(&tf.property, "property", "", "GA4 property ID (defaults to GA_PROPERTY_ID)")
+	cmd.Flags().StringVar(&tf.metric, "metric", "",
+		fmt.Sprintf("Metric to rank by (default %s; allowed: %s)",
+			spec.defaultMetric, strings.Join(spec.allowedMetrics, ", ")))
+	cmd.Flags().StringVar(&tf.period, "period", "7d", "Date window: today|yesterday|7d|28d|30d|90d|wtd")
+	cmd.Flags().IntVar(&tf.limit, "limit", 10, "Max rows to return")
+}
+
+// topRunE is the shared RunE shape for every top X subcommand. It uses
+// the spec to know which table to query, which dimensions to group on,
+// and which metric whitelist to enforce.
+func topRunE(cmd *cobra.Command, args []string, flags *rootFlags, tf *topFlags, spec topSpec) error {
+	if dryRunOK(flags) {
+		return nil
+	}
+	if tf.metric == "" {
+		tf.metric = spec.defaultMetric
+	}
+	if !containsString(spec.allowedMetrics, tf.metric) {
+		return usageErr(fmt.Errorf(
+			"unknown --metric %q for `top %s`; valid: %s",
+			tf.metric, spec.use, strings.Join(spec.allowedMetrics, ", "),
+		))
+	}
+	startDate, endDate, perr := resolveTopPeriod(tf.period)
+	if perr != nil {
+		return usageErr(perr)
+	}
+	if tf.limit <= 0 {
+		tf.limit = 10
+	}
+	argv := args
+	if len(argv) == 0 && tf.property != "" {
+		argv = []string{tf.property}
+	}
+	prop, err := resolveProperty(argv, flags)
+	if err != nil {
+		return err
+	}
+	source, err := topResolveDataSource(cmd, flags, spec, prop, startDate, endDate, tf.metric, tf.limit)
+	if err != nil {
+		return err
+	}
+	out := map[string]any{
+		"command":     "top " + spec.use,
+		"property":    prop,
+		"metric":      tf.metric,
+		"period":      tf.period,
+		"start_date":  startDate,
+		"end_date":    endDate,
+		"limit":       tf.limit,
+		"dimensions":  spec.dimensions,
+		"data_source": source.dataSource,
+		"rows":        source.rows,
+		"count":       len(source.rows),
+	}
+	if source.note != "" {
+		out["note"] = source.note
+	}
+	b, _ := json.MarshalIndent(out, "", "  ")
+	return printOutputWithFlags(cmd.OutOrStdout(), b, flags)
+}
+
+// newTopSubCmd is retained as a one-stop builder for callers (the original
+// dynamic-spec path). The per-leaf constructors below replicate the same
+// cobra.Command shape with a literal Use: so the verify-skill AST walker
+// can resolve each `top <leaf>` path to a single file.
 func newTopSubCmd(flags *rootFlags, spec topSpec) *cobra.Command {
-	var (
-		property string
-		metric   string
-		period   string
-		limit    int
-	)
+	tf := &topFlags{}
 	cmd := &cobra.Command{
 		Use:         spec.use,
 		Aliases:     spec.aliases,
@@ -161,71 +361,10 @@ func newTopSubCmd(flags *rootFlags, spec topSpec) *cobra.Command {
 		Example:     spec.example,
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if dryRunOK(flags) {
-				return nil
-			}
-			// Validate metric against this spec's whitelist. Default-on means
-			// agents can omit the flag entirely.
-			if metric == "" {
-				metric = spec.defaultMetric
-			}
-			if !containsString(spec.allowedMetrics, metric) {
-				return usageErr(fmt.Errorf(
-					"unknown --metric %q for `top %s`; valid: %s",
-					metric, spec.use, strings.Join(spec.allowedMetrics, ", "),
-				))
-			}
-			startDate, endDate, perr := resolveTopPeriod(period)
-			if perr != nil {
-				return usageErr(perr)
-			}
-			if limit <= 0 {
-				limit = 10
-			}
-
-			// Resolve the property like every other read command: positional
-			// arg, then --property, then GA_PROPERTY_ID, then first local
-			// store property.
-			argv := args
-			if len(argv) == 0 && property != "" {
-				argv = []string{property}
-			}
-			prop, err := resolveProperty(argv, flags)
-			if err != nil {
-				return err
-			}
-
-			source, err := topResolveDataSource(cmd, flags, spec, prop, startDate, endDate, metric, limit)
-			if err != nil {
-				return err
-			}
-
-			out := map[string]any{
-				"command":     "top " + spec.use,
-				"property":    prop,
-				"metric":      metric,
-				"period":      period,
-				"start_date":  startDate,
-				"end_date":    endDate,
-				"limit":       limit,
-				"dimensions":  spec.dimensions,
-				"data_source": source.dataSource,
-				"rows":        source.rows,
-				"count":       len(source.rows),
-			}
-			if source.note != "" {
-				out["note"] = source.note
-			}
-			b, _ := json.MarshalIndent(out, "", "  ")
-			return printOutputWithFlags(cmd.OutOrStdout(), b, flags)
+			return topRunE(cmd, args, flags, tf, spec)
 		},
 	}
-	cmd.Flags().StringVar(&property, "property", "", "GA4 property ID (defaults to GA_PROPERTY_ID)")
-	cmd.Flags().StringVar(&metric, "metric", "",
-		fmt.Sprintf("Metric to rank by (default %s; allowed: %s)",
-			spec.defaultMetric, strings.Join(spec.allowedMetrics, ", ")))
-	cmd.Flags().StringVar(&period, "period", "7d", "Date window: today|yesterday|7d|28d|30d|90d|wtd")
-	cmd.Flags().IntVar(&limit, "limit", 10, "Max rows to return")
+	bindTopFlags(cmd, tf, spec)
 	return cmd
 }
 
