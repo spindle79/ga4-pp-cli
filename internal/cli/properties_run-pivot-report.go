@@ -29,7 +29,7 @@ func newPropertiesRunPivotReportCmd(flags *rootFlags) *cobra.Command {
 		Use:         "run-pivot-report [property]",
 		Short:       "Returns a customized pivot report of your Google Analytics event data. Pivot reports are more advanced and...",
 		Example:     "  ga4-pp-cli properties run-pivot-report example-value",
-		Annotations: map[string]string{"pp:endpoint": "properties.run-pivot-report", "pp:method": "POST", "pp:path": "/v1beta/{property}:runPivotReport"},
+		Annotations: map[string]string{"pp:endpoint": "properties.run-pivot-report", "pp:method": "POST", "pp:path": "/v1beta/properties/{property}:runPivotReport"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
 			if err != nil {
@@ -42,7 +42,7 @@ func newPropertiesRunPivotReportCmd(flags *rootFlags) *cobra.Command {
 				return cerr
 			}
 
-			path := "/v1beta/{property}:runPivotReport"
+			path := "/v1beta/properties/{property}:runPivotReport"
 			path = replacePathParam(path, "property", property)
 			var body map[string]any
 			if stdinBody {

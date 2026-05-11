@@ -20,7 +20,7 @@ func newPropertiesBatchRunReportsCmd(flags *rootFlags) *cobra.Command {
 		Use:         "batch-run-reports [property]",
 		Short:       "Returns multiple reports in a batch. All reports must be for the same GA4 Property.",
 		Example:     "  ga4-pp-cli properties batch-run-reports example-value",
-		Annotations: map[string]string{"pp:endpoint": "properties.batch-run-reports", "pp:method": "POST", "pp:path": "/v1beta/{property}:batchRunReports"},
+		Annotations: map[string]string{"pp:endpoint": "properties.batch-run-reports", "pp:method": "POST", "pp:path": "/v1beta/properties/{property}:batchRunReports"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
 			if err != nil {
@@ -33,7 +33,7 @@ func newPropertiesBatchRunReportsCmd(flags *rootFlags) *cobra.Command {
 				return cerr
 			}
 
-			path := "/v1beta/{property}:batchRunReports"
+			path := "/v1beta/properties/{property}:batchRunReports"
 			path = replacePathParam(path, "property", property)
 			var body map[string]any
 			if stdinBody {

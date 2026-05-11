@@ -32,7 +32,7 @@ func newPropertiesRunReportCmd(flags *rootFlags) *cobra.Command {
 		Use:         "run-report [property]",
 		Short:       "Returns a customized report of your Google Analytics event data. Reports contain statistics derived from data...",
 		Example:     "  ga4-pp-cli properties run-report example-value",
-		Annotations: map[string]string{"pp:endpoint": "properties.run-report", "pp:method": "POST", "pp:path": "/v1beta/{property}:runReport"},
+		Annotations: map[string]string{"pp:endpoint": "properties.run-report", "pp:method": "POST", "pp:path": "/v1beta/properties/{property}:runReport"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
 			if err != nil {
@@ -45,7 +45,7 @@ func newPropertiesRunReportCmd(flags *rootFlags) *cobra.Command {
 				return cerr
 			}
 
-			path := "/v1beta/{property}:runReport"
+			path := "/v1beta/properties/{property}:runReport"
 			path = replacePathParam(path, "property", property)
 			var body map[string]any
 			if stdinBody {

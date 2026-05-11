@@ -28,7 +28,7 @@ func newPropertiesRunRealtimeReportCmd(flags *rootFlags) *cobra.Command {
 		Use:         "run-realtime-report [property]",
 		Short:       "Returns a customized report of realtime event data for your property. Events appear in realtime reports seconds...",
 		Example:     "  ga4-pp-cli properties run-realtime-report example-value",
-		Annotations: map[string]string{"pp:endpoint": "properties.run-realtime-report", "pp:method": "POST", "pp:path": "/v1beta/{property}:runRealtimeReport"},
+		Annotations: map[string]string{"pp:endpoint": "properties.run-realtime-report", "pp:method": "POST", "pp:path": "/v1beta/properties/{property}:runRealtimeReport"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
 			if err != nil {
@@ -41,7 +41,7 @@ func newPropertiesRunRealtimeReportCmd(flags *rootFlags) *cobra.Command {
 				return cerr
 			}
 
-			path := "/v1beta/{property}:runRealtimeReport"
+			path := "/v1beta/properties/{property}:runRealtimeReport"
 			path = replacePathParam(path, "property", property)
 			var body map[string]any
 			if stdinBody {

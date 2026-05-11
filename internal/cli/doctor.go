@@ -168,37 +168,38 @@ func newDoctorCmd(flags *rootFlags) *cobra.Command {
 
 			// Check auth
 			if cfg != nil {
+				// AuthHeader() returns a static bearer when one is configured,
+				// but service-account JSON auth mints tokens dynamically through
+				// the googleauth package — CredentialsPath is the signal there.
 				header := cfg.AuthHeader()
-				if header == "" {
-					report["auth"] = "not configured"
-					report["auth_hint"] = "export GOOGLE_ANALYTICS_DATA_OAUTH2C=<your-key>"
-				} else {
+				switch {
+				case header != "":
 					report["auth"] = "configured"
 					report["auth_source"] = cfg.AuthSource
+				case cfg.CredentialsPath != "":
+					report["auth"] = "configured"
+					report["auth_source"] = cfg.AuthSource
+				default:
+					report["auth"] = "not configured"
+					report["auth_hint"] = "set GOOGLE_APPLICATION_CREDENTIALS=<path to service-account JSON> or GOOGLE_ANALYTICS_DATA_OAUTH2C=<bearer token>"
 				}
 			}
 
-			// Check auth environment variables
+			// Check auth environment variables. Either is sufficient — config.Load
+			// accepts the service-account JSON path or a bearer token.
 			authEnvSet := []string{}
-			authEnvRequiredMissing := []string{}
-			authEnvInfo := []string{}
-			authEnvOptionalNames := []string{}
-			// Validation rejects multi-OR-group specs upstream, so the single optional-satisfied state is sufficient at runtime.
-			authEnvOptionalSatisfied := false
+			authEnvOptionalNames := []string{"GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_ANALYTICS_DATA_OAUTH2C"}
+			if os.Getenv("GOOGLE_APPLICATION_CREDENTIALS") != "" {
+				authEnvSet = append(authEnvSet, "GOOGLE_APPLICATION_CREDENTIALS")
+			}
 			if os.Getenv("GOOGLE_ANALYTICS_DATA_OAUTH2C") != "" {
 				authEnvSet = append(authEnvSet, "GOOGLE_ANALYTICS_DATA_OAUTH2C")
-			} else {
-				authEnvRequiredMissing = append(authEnvRequiredMissing, "GOOGLE_ANALYTICS_DATA_OAUTH2C")
 			}
 			switch {
-			case len(authEnvRequiredMissing) > 0:
-				report["env_vars"] = "ERROR missing required: " + strings.Join(authEnvRequiredMissing, ", ")
-			case len(authEnvOptionalNames) > 1 && !authEnvOptionalSatisfied:
-				report["env_vars"] = "INFO set one of: " + strings.Join(authEnvOptionalNames, " or ")
-			case len(authEnvInfo) > 0:
-				report["env_vars"] = "INFO " + strings.Join(authEnvInfo, "; ")
+			case len(authEnvSet) == 0:
+				report["env_vars"] = "ERROR set one of: " + strings.Join(authEnvOptionalNames, " or ")
 			default:
-				report["env_vars"] = fmt.Sprintf("OK %d/%d available", len(authEnvSet), 1)
+				report["env_vars"] = fmt.Sprintf("OK %d/%d available (%s)", len(authEnvSet), len(authEnvOptionalNames), strings.Join(authEnvSet, ", "))
 			}
 
 			// Check API connectivity and validate credentials.

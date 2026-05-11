@@ -24,7 +24,7 @@ func newPropertiesCheckCompatibilityCmd(flags *rootFlags) *cobra.Command {
 		Use:         "check-compatibility [property]",
 		Short:       "This compatibility method lists dimensions and metrics that can be added to a report request and maintain...",
 		Example:     "  ga4-pp-cli properties check-compatibility example-value",
-		Annotations: map[string]string{"pp:endpoint": "properties.check-compatibility", "pp:method": "POST", "pp:path": "/v1beta/{property}:checkCompatibility"},
+		Annotations: map[string]string{"pp:endpoint": "properties.check-compatibility", "pp:method": "POST", "pp:path": "/v1beta/properties/{property}:checkCompatibility"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
 			if err != nil {
@@ -37,7 +37,7 @@ func newPropertiesCheckCompatibilityCmd(flags *rootFlags) *cobra.Command {
 				return cerr
 			}
 
-			path := "/v1beta/{property}:checkCompatibility"
+			path := "/v1beta/properties/{property}:checkCompatibility"
 			path = replacePathParam(path, "property", property)
 			var body map[string]any
 			if stdinBody {

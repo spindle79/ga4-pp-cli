@@ -21,7 +21,7 @@ func newPropertiesBatchRunPivotReportsCmd(flags *rootFlags) *cobra.Command {
 		Aliases:     []string{"create"},
 		Short:       "Returns multiple pivot reports in a batch. All reports must be for the same GA4 Property.",
 		Example:     "  ga4-pp-cli properties batch-run-pivot-reports example-value",
-		Annotations: map[string]string{"pp:endpoint": "properties.batch-run-pivot-reports", "pp:method": "POST", "pp:path": "/v1beta/{property}:batchRunPivotReports"},
+		Annotations: map[string]string{"pp:endpoint": "properties.batch-run-pivot-reports", "pp:method": "POST", "pp:path": "/v1beta/properties/{property}:batchRunPivotReports"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
 			if err != nil {
@@ -34,7 +34,7 @@ func newPropertiesBatchRunPivotReportsCmd(flags *rootFlags) *cobra.Command {
 				return cerr
 			}
 
-			path := "/v1beta/{property}:batchRunPivotReports"
+			path := "/v1beta/properties/{property}:batchRunPivotReports"
 			path = replacePathParam(path, "property", property)
 			var body map[string]any
 			if stdinBody {
