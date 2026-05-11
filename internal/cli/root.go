@@ -206,6 +206,11 @@ See README.md or the bundled SKILL.md for recipes.`,
 	rootCmd.AddCommand(newWatchCmd(flags))
 	// Local data layer: SQLite-backed sync + search + export + raw SQL.
 	rootCmd.AddCommand(newSyncCmd(flags))
+	// `top` is the agent-native umbrella for "what's the top-N X by metric"
+	// answers built on the synced daily-mirror tables. Each subcommand
+	// auto-resolves property, period, metric — designed so an LLM can call
+	// it with zero flags and still get the right shape back.
+	rootCmd.AddCommand(newTopCmd(flags))
 	rootCmd.AddCommand(newSearchCmd(flags))
 	rootCmd.AddCommand(newSQLCmd(flags))
 	rootCmd.AddCommand(newExportCmd(flags))

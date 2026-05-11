@@ -28,7 +28,7 @@ import (
 // StoreSchemaVersion is the on-disk schema version this binary understands.
 // Stamped into PRAGMA user_version on fresh databases and checked on every
 // open. Bump when migrations change table shape.
-const StoreSchemaVersion = 1
+const StoreSchemaVersion = 2
 
 // schemaDoc is the canonical inline description of the v1 schema. It
 // duplicates the DDL in migrations/0001_init.sql so the source file is
@@ -104,6 +104,9 @@ var _ = schemaDoc
 
 //go:embed migrations/0001_init.sql
 var migration0001 string
+
+//go:embed migrations/0002_top_tables.sql
+var migration0002 string
 
 // Store is the read+write handle for ga4-pp-cli's local SQLite DB.
 type Store struct {
@@ -198,6 +201,15 @@ func (s *Store) migrate(ctx context.Context) error {
 	if current == 0 {
 		if _, err := s.db.ExecContext(ctx, migration0001); err != nil {
 			return fmt.Errorf("apply migration 0001: %w", err)
+		}
+	}
+	if current < 2 {
+		// 0002 introduces acquisition_daily, events_daily, devices_geo_daily.
+		// Statements are guarded by CREATE TABLE IF NOT EXISTS so re-running
+		// against a database that already has them (e.g. a brand-new install
+		// that runs both 0001 and 0002 in the same pass) is a no-op.
+		if _, err := s.db.ExecContext(ctx, migration0002); err != nil {
+			return fmt.Errorf("apply migration 0002: %w", err)
 		}
 	}
 	if _, err := s.db.ExecContext(ctx,
@@ -437,6 +449,238 @@ func (s *Store) PagesDailyRange(propertyID, startDate, endDate string) ([]PageDa
 }
 
 // ----------------------------------------------------------------------------
+// acquisition_daily
+// ----------------------------------------------------------------------------
+
+// AcquisitionDaily is one (date, source, medium, campaign) row.
+//
+// Every dimension column is part of the PRIMARY KEY together with property_id
+// and date — if a future caller adds a dimension to the runReport request
+// without also adding it here, the rows will silently collapse on UPSERT.
+// Don't add e.g. session_default_channel_group as an extra "descriptive"
+// dimension; fetch that into a side-table.
+type AcquisitionDaily struct {
+	PropertyID      string  `json:"property_id"`
+	Date            string  `json:"date"`
+	SessionSource   string  `json:"session_source"`
+	SessionMedium   string  `json:"session_medium"`
+	SessionCampaign string  `json:"session_campaign"`
+	Sessions        float64 `json:"sessions"`
+	TotalUsers      float64 `json:"total_users"`
+	NewUsers        float64 `json:"new_users"`
+	EngagedSessions float64 `json:"engaged_sessions"`
+	Conversions     float64 `json:"conversions"`
+	TotalRevenue    float64 `json:"total_revenue"`
+}
+
+// UpsertAcquisitionDaily writes a batch in a single tx, replacing rows that
+// conflict on (property_id, date, session_source, session_medium,
+// session_campaign).
+func (s *Store) UpsertAcquisitionDaily(rows []AcquisitionDaily) (int, error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO acquisition_daily(
+			property_id, date, session_source, session_medium, session_campaign,
+			sessions, total_users, new_users, engaged_sessions, conversions, total_revenue, updated_at
+		) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(property_id, date, session_source, session_medium, session_campaign) DO UPDATE SET
+			sessions         = excluded.sessions,
+			total_users      = excluded.total_users,
+			new_users        = excluded.new_users,
+			engaged_sessions = excluded.engaged_sessions,
+			conversions      = excluded.conversions,
+			total_revenue    = excluded.total_revenue,
+			updated_at       = excluded.updated_at
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	maxDate := ""
+	propertyID := ""
+	for _, r := range rows {
+		if _, err := stmt.Exec(
+			r.PropertyID, r.Date, r.SessionSource, r.SessionMedium, r.SessionCampaign,
+			r.Sessions, r.TotalUsers, r.NewUsers, r.EngagedSessions, r.Conversions, r.TotalRevenue, now,
+		); err != nil {
+			return 0, fmt.Errorf("insert acquisition_daily %s/%s: %w", r.PropertyID, r.Date, err)
+		}
+		if r.Date > maxDate {
+			maxDate = r.Date
+		}
+		propertyID = r.PropertyID
+	}
+
+	if err := s.saveSyncStateTx(tx, propertyID, "acquisition", maxDate, len(rows)); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return len(rows), nil
+}
+
+// ----------------------------------------------------------------------------
+// events_daily
+// ----------------------------------------------------------------------------
+
+// EventDaily is one (date, event_name, page_path) row.
+type EventDaily struct {
+	PropertyID        string  `json:"property_id"`
+	Date              string  `json:"date"`
+	EventName         string  `json:"event_name"`
+	PagePath          string  `json:"page_path"`
+	EventCount        float64 `json:"event_count"`
+	EventCountPerUser float64 `json:"event_count_per_user"`
+	EventValue        float64 `json:"event_value"`
+	TotalUsers        float64 `json:"total_users"`
+	Conversions       float64 `json:"conversions"`
+}
+
+// UpsertEventsDaily writes a batch in a single tx, replacing rows that
+// conflict on (property_id, date, event_name, page_path).
+func (s *Store) UpsertEventsDaily(rows []EventDaily) (int, error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO events_daily(
+			property_id, date, event_name, page_path,
+			event_count, event_count_per_user, event_value, total_users, conversions, updated_at
+		) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(property_id, date, event_name, page_path) DO UPDATE SET
+			event_count          = excluded.event_count,
+			event_count_per_user = excluded.event_count_per_user,
+			event_value          = excluded.event_value,
+			total_users          = excluded.total_users,
+			conversions          = excluded.conversions,
+			updated_at           = excluded.updated_at
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	maxDate := ""
+	propertyID := ""
+	for _, r := range rows {
+		if _, err := stmt.Exec(
+			r.PropertyID, r.Date, r.EventName, r.PagePath,
+			r.EventCount, r.EventCountPerUser, r.EventValue, r.TotalUsers, r.Conversions, now,
+		); err != nil {
+			return 0, fmt.Errorf("insert events_daily %s/%s/%s: %w", r.PropertyID, r.Date, r.EventName, err)
+		}
+		if r.Date > maxDate {
+			maxDate = r.Date
+		}
+		propertyID = r.PropertyID
+	}
+
+	if err := s.saveSyncStateTx(tx, propertyID, "events", maxDate, len(rows)); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return len(rows), nil
+}
+
+// ----------------------------------------------------------------------------
+// devices_geo_daily
+// ----------------------------------------------------------------------------
+
+// DevicesGeoDaily is one (date, device_category, country) row.
+type DevicesGeoDaily struct {
+	PropertyID             string  `json:"property_id"`
+	Date                   string  `json:"date"`
+	DeviceCategory         string  `json:"device_category"`
+	Country                string  `json:"country"`
+	Sessions               float64 `json:"sessions"`
+	TotalUsers             float64 `json:"total_users"`
+	EngagedSessions        float64 `json:"engaged_sessions"`
+	AverageSessionDuration float64 `json:"average_session_duration"`
+	ScreenPageViews        float64 `json:"screen_page_views"`
+}
+
+// UpsertDevicesGeoDaily writes a batch in a single tx, replacing rows that
+// conflict on (property_id, date, device_category, country).
+func (s *Store) UpsertDevicesGeoDaily(rows []DevicesGeoDaily) (int, error) {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO devices_geo_daily(
+			property_id, date, device_category, country,
+			sessions, total_users, engaged_sessions, average_session_duration, screen_page_views, updated_at
+		) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(property_id, date, device_category, country) DO UPDATE SET
+			sessions                 = excluded.sessions,
+			total_users              = excluded.total_users,
+			engaged_sessions         = excluded.engaged_sessions,
+			average_session_duration = excluded.average_session_duration,
+			screen_page_views        = excluded.screen_page_views,
+			updated_at               = excluded.updated_at
+	`)
+	if err != nil {
+		return 0, err
+	}
+	defer stmt.Close()
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	maxDate := ""
+	propertyID := ""
+	for _, r := range rows {
+		if _, err := stmt.Exec(
+			r.PropertyID, r.Date, r.DeviceCategory, r.Country,
+			r.Sessions, r.TotalUsers, r.EngagedSessions, r.AverageSessionDuration, r.ScreenPageViews, now,
+		); err != nil {
+			return 0, fmt.Errorf("insert devices_geo_daily %s/%s/%s: %w", r.PropertyID, r.Date, r.DeviceCategory, err)
+		}
+		if r.Date > maxDate {
+			maxDate = r.Date
+		}
+		propertyID = r.PropertyID
+	}
+
+	if err := s.saveSyncStateTx(tx, propertyID, "devices_geo", maxDate, len(rows)); err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return len(rows), nil
+}
+
+// ----------------------------------------------------------------------------
 // sync_state
 // ----------------------------------------------------------------------------
 
@@ -497,11 +741,14 @@ func (s *Store) AllSyncStates() ([]SyncState, error) {
 // interpolated directly into the SQL.
 func (s *Store) TableRowCount(table string) (int, error) {
 	allowed := map[string]bool{
-		"properties":  true,
-		"dimensions":  true,
-		"metrics":     true,
-		"pages_daily": true,
-		"sync_state":  true,
+		"properties":        true,
+		"dimensions":        true,
+		"metrics":           true,
+		"pages_daily":       true,
+		"acquisition_daily": true,
+		"events_daily":      true,
+		"devices_geo_daily": true,
+		"sync_state":        true,
 	}
 	if !allowed[table] {
 		return 0, fmt.Errorf("unknown table %q", table)

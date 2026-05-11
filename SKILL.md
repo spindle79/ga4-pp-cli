@@ -115,6 +115,54 @@ ga4-pp-cli which "<capability in your own words>"
 ## Recipes
 
 
+### Top performing pages this week
+
+```bash
+ga4-pp-cli top pages --period 7d --agent
+```
+
+Local-first answer to "what are my best pages right now". Returns rank + page_path + sessions from the synced pages_daily table; auto-refreshes if the local store is older than 6h. <100ms warm.
+
+### Where is my traffic coming from
+
+```bash
+ga4-pp-cli top sources --period 7d --agent
+```
+
+Top traffic sources by sessions across source/medium pairs (organic/google, direct/(none), etc). Same table-of-rows shape as `top pages`. Use `--metric total_users` for unique-visitor ranking instead.
+
+### What events are firing most
+
+```bash
+ga4-pp-cli top events --period 7d --agent
+```
+
+Top events by event_count. Reads events_daily — covers page_view, session_start, click, scroll, and every custom event firing on the property.
+
+### Top countries by traffic
+
+```bash
+ga4-pp-cli top countries --period 7d --agent
+```
+
+Top countries by sessions. Pulls from devices_geo_daily (no separate countries table needed — the (date, device_category, country) PK keeps both pivots correct).
+
+### Mobile vs desktop split
+
+```bash
+ga4-pp-cli top devices --period 7d --agent
+```
+
+Sessions broken out by device_category (desktop/mobile/tablet). Pair with `top countries` for a "where's my mobile traffic coming from" answer.
+
+### Top performing campaigns
+
+```bash
+ga4-pp-cli top campaigns --period 7d --agent
+```
+
+Top sessionCampaignName values by sessions. Reads acquisition_daily. `(direct)` rolls up no-campaign sessions so the head of the list is your real marketing performance.
+
 ### Top movers this week
 
 ```bash
