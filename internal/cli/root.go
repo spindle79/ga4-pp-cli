@@ -15,6 +15,7 @@ import (
 
 	"ga4-pp-cli/internal/client"
 	"ga4-pp-cli/internal/config"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -167,6 +168,16 @@ See README.md or the bundled SKILL.md for recipes.`,
 				noColor = true
 			}
 		}
+		// Auto-JSON when stdout is not a terminal (i.e., the output is being
+		// piped to another command or captured by an agent harness). The README
+		// promises "default in terminal, JSON when piped" — this is what makes
+		// that true at the flag level, so downstream renderers see asJSON=true
+		// without each command having to call isTerminal itself.
+		// Only flip when the user has not explicitly passed --json (in either
+		// direction); --json=false on a piped stdout still respects user intent.
+		if !cmd.Flags().Changed("json") && !isatty.IsTerminal(os.Stdout.Fd()) {
+			flags.asJSON = true
+		}
 		switch flags.dataSource {
 		case "auto", "live", "local":
 			// valid
@@ -187,6 +198,13 @@ See README.md or the bundled SKILL.md for recipes.`,
 	rootCmd.AddCommand(newTemplatesCmd(flags))
 	rootCmd.AddCommand(newDriftCmd(flags))
 	rootCmd.AddCommand(newWatchCmd(flags))
+	// Local data layer: SQLite-backed sync + search + raw SQL.
+	rootCmd.AddCommand(newSyncCmd(flags))
+	rootCmd.AddCommand(newSearchCmd(flags))
+	rootCmd.AddCommand(newSQLCmd(flags))
+	// Compound commands that mine pages_daily for signals.
+	rootCmd.AddCommand(newTrafficAnomaliesCmd(flags))
+	rootCmd.AddCommand(newBotTrafficCmd(flags))
 	rootCmd.AddCommand(newDoctorCmd(flags))
 	rootCmd.AddCommand(newAuthCmd(flags))
 	rootCmd.AddCommand(newAgentContextCmd(rootCmd))

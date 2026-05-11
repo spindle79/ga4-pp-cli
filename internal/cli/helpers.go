@@ -89,12 +89,21 @@ type cliError struct {
 func (e *cliError) Error() string { return e.err.Error() }
 func (e *cliError) Unwrap() error { return e.err }
 
-func usageErr(err error) error    { return &cliError{code: 2, err: err} }
-func notFoundErr(err error) error { return &cliError{code: 3, err: err} }
-func authErr(err error) error     { return &cliError{code: 4, err: err} }
-func apiErr(err error) error      { return &cliError{code: 5, err: err} }
-func configErr(err error) error   { return &cliError{code: 10, err: err} }
-func rateLimitErr(err error) error { return &cliError{code: 7, err: err} }
+// Exit codes follow the Printing Press convention:
+//   0 = success
+//   2 = usage (bad flags, missing args, config problems)
+//   3 = auth (missing/invalid credentials, 401/403)
+//   4 = not-found (404, unknown resource)
+//   5 = rate-limit (429)
+//   7 = server (5xx, generic API failure)
+func usageErr(err error) error     { return &cliError{code: 2, err: err} }
+func authErr(err error) error      { return &cliError{code: 3, err: err} }
+func notFoundErr(err error) error  { return &cliError{code: 4, err: err} }
+func rateLimitErr(err error) error { return &cliError{code: 5, err: err} }
+func serverErr(err error) error    { return &cliError{code: 7, err: err} }
+
+// configErr folds into usageErr (code 2) — bad config is a user-supplied input problem.
+func configErr(err error) error { return usageErr(err) }
 
 // dryRunOK reports whether the command should short-circuit without doing any
 // real work because --dry-run was set. The verify pipeline probes hand-written
@@ -149,7 +158,7 @@ func classifyAPIError(err error, flags *rootFlags) error {
 		if flags != nil && flags.idempotent {
 			return writeNoop(flags, "already_exists", "already exists (no-op)")
 		}
-		classified := apiErr(err)
+		classified := serverErr(err)
 		writeAPIErrorEnvelope(flags, classified, ExitCode(classified))
 		return classified
 	case strings.Contains(msg, "HTTP 400") && cliutil.LooksLikeAuthError(msg):
@@ -171,7 +180,7 @@ func classifyAPIError(err error, flags *rootFlags) error {
 	case strings.Contains(msg, "HTTP 429"):
 		return rateLimitErr(err)
 	default:
-		return apiErr(err)
+		return serverErr(err)
 	}
 }
 
@@ -190,138 +199,6 @@ func newTabWriter(w io.Writer) *tabwriter.Writer {
 }
 func replacePathParam(path, name, value string) string {
 	return strings.ReplaceAll(path, "{"+name+"}", value)
-}
-
-// paginatedGet fetches pages and concatenates array results. The headers
-// argument carries per-endpoint required headers (e.g. cal-api-version) that
-// must be sent on every page request, including the first; pass nil when the
-// endpoint has no per-endpoint header overrides.
-func paginatedGet(c interface {
-	GetWithHeaders(path string, params map[string]string, headers map[string]string) (json.RawMessage, error)
-}, path string, params map[string]string, headers map[string]string, fetchAll bool, cursorParam, nextCursorPath, hasMoreField string) (json.RawMessage, error) {
-	// Clean zero-value params
-	clean := map[string]string{}
-	for k, v := range params {
-		if v != "" && v != "0" && v != "false" {
-			clean[k] = v
-		}
-	}
-
-	if !fetchAll {
-		return c.GetWithHeaders(path, clean, headers)
-	}
-
-	// Fetch all pages
-	allItems := make([]json.RawMessage, 0)
-	page := 0
-	for {
-		page++
-		if humanFriendly {
-			fmt.Fprintf(os.Stderr, "fetching page %d...\n", page)
-		} else {
-			fmt.Fprintf(os.Stderr, `{"event":"page_fetch","page":%d}`+"\n", page)
-		}
-
-		data, err := c.GetWithHeaders(path, clean, headers)
-		if err != nil {
-			return nil, err
-		}
-
-		// Try to extract items array
-		var items []json.RawMessage
-		if json.Unmarshal(data, &items) == nil {
-			allItems = append(allItems, items...)
-		} else {
-			// Response is an object - look for array inside
-			var obj map[string]json.RawMessage
-			if json.Unmarshal(data, &obj) == nil {
-				if nested, ok := extractPaginatedItems(obj); ok {
-					allItems = append(allItems, nested...)
-				}
-
-				// Check for next cursor
-				if nextCursorPath != "" {
-					if tokenRaw, ok := rawAtPath(obj, nextCursorPath); ok {
-						var token string
-						if json.Unmarshal(tokenRaw, &token) == nil && token != "" {
-							clean[cursorParam] = token
-							continue
-						}
-					}
-				}
-
-				// Check has_more
-				if hasMoreField != "" {
-					if moreRaw, ok := rawAtPath(obj, hasMoreField); ok {
-						var more bool
-						if json.Unmarshal(moreRaw, &more) == nil && more {
-							continue
-						}
-					}
-				}
-			}
-			// No more pages
-			break
-		}
-
-		// For direct arrays, can't paginate without cursor
-		break
-	}
-
-	if humanFriendly {
-		fmt.Fprintf(os.Stderr, "fetched %d items across %d pages\n", len(allItems), page)
-	} else {
-		fmt.Fprintf(os.Stderr, `{"event":"complete","total":%d,"pages":%d}`+"\n", len(allItems), page)
-	}
-	result, _ := json.Marshal(allItems)
-	return json.RawMessage(result), nil
-}
-
-func extractPaginatedItems(obj map[string]json.RawMessage) ([]json.RawMessage, bool) {
-	for _, field := range []string{"data", "items", "results", "messages", "members", "values"} {
-		if arr, ok := obj[field]; ok {
-			var nested []json.RawMessage
-			if json.Unmarshal(arr, &nested) == nil {
-				return nested, true
-			}
-		}
-	}
-
-	var onlyArray []json.RawMessage
-	arrayCount := 0
-	for _, raw := range obj {
-		var candidate []json.RawMessage
-		if json.Unmarshal(raw, &candidate) == nil {
-			onlyArray = candidate
-			arrayCount++
-		}
-	}
-	if arrayCount == 1 {
-		return onlyArray, true
-	}
-	return nil, false
-}
-
-func rawAtPath(obj map[string]json.RawMessage, path string) (json.RawMessage, bool) {
-	if raw, ok := obj[path]; ok {
-		return raw, true
-	}
-
-	current := obj
-	parts := strings.Split(path, ".")
-	for i, part := range parts {
-		raw, ok := current[part]
-		if !ok {
-			return nil, false
-		}
-		if i == len(parts)-1 {
-			return raw, true
-		}
-		if err := json.Unmarshal(raw, &current); err != nil {
-			return nil, false
-		}
-	}
-	return nil, false
 }
 
 // printJSONFiltered marshals a Go-typed value through the same output
@@ -456,34 +333,6 @@ func printOutputWithFlags(w io.Writer, data json.RawMessage, flags *rootFlags) e
 		return printCSV(w, data)
 	}
 	return printOutput(w, data, flags.asJSON)
-}
-
-// extractResponseData unwraps common API response envelopes for display.
-// Many APIs return {"status":"success","data":[...]} instead of a bare array.
-// This extracts the inner data for output helpers (filterFields, compactFields,
-// printAutoTable) that expect arrays or flat objects.
-//
-// Only unwraps when a "status" field is present and indicates success — this
-// avoids false positives on APIs where "data" is a regular field (e.g., Stripe
-// returns {"data":[...],"has_more":true} where "data" is the list, not an
-// envelope wrapper).
-func extractResponseData(data json.RawMessage) json.RawMessage {
-	var envelope struct {
-		Status string          `json:"status"`
-		Data   json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(data, &envelope); err != nil {
-		return data
-	}
-	if envelope.Data == nil || envelope.Status == "" {
-		return data // No status field = not an envelope, might be regular "data" field
-	}
-	switch envelope.Status {
-	case "success", "ok", "OK", "Success":
-		return envelope.Data
-	default:
-		return data
-	}
 }
 
 // compactFields keeps only the most important fields for agent consumption.

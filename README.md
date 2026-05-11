@@ -1,5 +1,7 @@
 # Google Analytics 4 CLI
 
+> GA4 isn't just a web analytics tool. It's a behavior fingerprint across acquisition, engagement, and monetization surfaces. Every page hit, session, and conversion is a signal about how visitors really use the product — the `pages`, `funnel`, `drift`, `watch`, `traffic-anomalies`, and `bot-traffic` commands are how you read that fingerprint.
+
 **Every GA4 Data API endpoint, plus saved report profiles, drift detection, schema search, and quality guards no other GA4 tool ships.**
 
 Built on top of the full GA4 Data API v1beta surface (runReport, runRealtimeReport, runPivotReport, batch, checkCompatibility, getMetadata) and absorbs the URL-centric tools from the spindle79 ga4-mcp-server. On top of that it adds saved report profiles, period-over-period drift detection, an FTS schema browser, a realtime watch loop, and automatic sampling/(other)/quota warnings on every response.
@@ -102,6 +104,26 @@ These capabilities aren't available in any other tool for this API.
   ga4-pp-cli drift pages --window 7d --top 20 --agent
   ```
 
+### Local data layer (SQLite)
+- **`sync schema` / `sync pages` / `sync properties`** — Populate a local SQLite store at `$PRESS_DATA_DIR/ga4/data.db` (falls back to `~/.local/share/ga4-pp-cli/data.db`). Tables: `properties`, `dimensions`, `metrics`, `pages_daily`, `sync_state`, with FTS5 mirrors `dimensions_fts` / `metrics_fts`.
+
+  ```bash
+  ga4-pp-cli sync schema --agent
+  ga4-pp-cli sync pages --days 30 --agent
+  ```
+- **`search <query>`** — FTS5 across dimensions + metrics + synced page paths in one call. Honors `--data-source local|auto`.
+
+  ```bash
+  ga4-pp-cli search engagement --agent
+  ```
+- **`sql "<SELECT …>"`** — Read-only raw SQL escape hatch over the store. Refuses anything that isn't `SELECT/WITH/EXPLAIN/PRAGMA`.
+
+  ```bash
+  ga4-pp-cli sql "SELECT page_path, SUM(sessions) FROM pages_daily GROUP BY page_path ORDER BY 2 DESC LIMIT 10"
+  ```
+- **`traffic-anomalies --days 30 --threshold 2.0`** — Per-page z-scores over the rolling-window sessions series; flags pages whose latest day exceeds the threshold.
+- **`bot-traffic --days 7`** — Heuristic scan of `pages_daily` for near-zero engagement, near-zero session duration, and high sessions-per-user, ranked by total sessions.
+
 ### Agent-native plumbing
 - **`watch realtime`** — Poll runRealtimeReport on an interval and stream deltas as agent-friendly JSON.
 
@@ -133,6 +155,13 @@ These capabilities aren't available in any other tool for this API.
   ```bash
   ga4-pp-cli templates compat weekly-content --agent
   ```
+
+<!-- Future work (intentionally deferred):
+     - retention   — cohort retention curves built off pages_daily + a users-by-first-visit dim.
+     - acquisition-mix — multi-source breakdown joining sessionSource, sessionMedium, sessionCampaign.
+     - dropoff     — funnel-style step dropoff joining a saved funnel template against pages_daily.
+     These are good next compound commands once the user has a real GA4 property
+     to sync from and can sanity-check the math against the GA4 web UI. -->
 
 ## Usage
 
@@ -185,7 +214,7 @@ This CLI is designed for AI agent consumption:
 - **Piped input** - write commands can accept structured input when their help lists `--stdin`
 - **Agent-safe by default** - no colors or formatting unless `--human-friendly` is set
 
-Exit codes: `0` success, `2` usage error, `3` not found, `4` auth error, `5` API error, `7` rate limited, `10` config error.
+Exit codes (Printing Press convention): `0` success, `2` usage error (bad flags, missing args, bad config), `3` auth error (401/403, missing credentials), `4` not found (404, unknown resource), `5` rate limited (429), `7` server error (5xx, generic API failure).
 
 ## Use with Claude Code
 
@@ -271,12 +300,19 @@ Environment variables:
 | `GOOGLE_ANALYTICS_DATA_OAUTH2C` | per_call | Yes | Set to your API credential. |
 
 ## Troubleshooting
-**Authentication errors (exit code 4)**
+**Authentication errors (exit code 3)**
 - Run `ga4-pp-cli doctor` to check credentials
 - Verify the environment variable is set: `echo $GOOGLE_ANALYTICS_DATA_OAUTH2C`
-**Not found errors (exit code 3)**
+
+**Not found errors (exit code 4)**
 - Check the resource ID is correct
 - Run the `list` command to see available items
+
+**Rate limited (exit code 5)**
+- Back off and retry; GA4 quotas reset on the hour for most tokens.
+
+**Server errors (exit code 7)**
+- Generic API failure (5xx). Re-run with `--json` to see the raw response.
 
 ### API-specific
 

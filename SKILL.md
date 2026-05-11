@@ -14,6 +14,8 @@ metadata:
 
 # Google Analytics 4 — Printing Press CLI
 
+> GA4 isn't just a web analytics tool. It's a behavior fingerprint across acquisition, engagement, and monetization surfaces. Every page hit, session, and conversion is a signal about how visitors really use the product — the `pages`, `funnel`, `drift`, `watch`, `traffic-anomalies`, and `bot-traffic` commands are how you read that fingerprint.
+
 ## Prerequisites: Install the CLI
 
 This skill drives the `ga4-pp-cli` binary. **You must verify the CLI is installed before invoking any command from this skill.** If it is missing, install it first:

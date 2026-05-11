@@ -69,11 +69,20 @@ func saveSchemaCache(sc *schemaCache) error {
 func newSchemaCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "schema",
-		Short: "Browse GA4 dimensions and metrics (offline cache)",
+		Short: "Browse GA4 dimensions and metrics (offline JSON cache; prefer 'sync schema' + 'search')",
 		Long: `'schema fetch' calls getMetadata once and caches the result; subsequent
 'schema list' and 'schema search' calls run offline against the cache. The
 cache includes custom dimensions/metrics registered on the property
-(customEvent:* / customUser:*).`,
+(customEvent:* / customUser:*).
+
+Back-compat aliases. The Printing Press-standard equivalents live at the top
+level and read the SQLite-backed local store:
+
+  schema fetch  → ga4-pp-cli sync schema
+  schema search → ga4-pp-cli search
+
+New code should prefer the top-level commands; this JSON cache is retained
+so existing automations keep working.`,
 	}
 	cmd.AddCommand(
 		newSchemaFetchCmd(flags),
