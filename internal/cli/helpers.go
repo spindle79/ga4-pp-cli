@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"ga4-pp-cli/internal/cliutil"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"io"
@@ -44,6 +45,12 @@ func colorEnabled() bool {
 
 func isTerminal(w io.Writer) bool {
 	if f, ok := w.(*os.File); ok {
+		// isatty is the authoritative TTY probe across stdout/stderr/file
+		// descriptors; falling back to ModeCharDevice keeps the function
+		// useful for tests that pass an *os.File backed by a pipe.
+		if isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd()) {
+			return true
+		}
 		fi, err := f.Stat()
 		if err != nil {
 			return true
@@ -333,6 +340,10 @@ func printOutputWithFlags(w io.Writer, data json.RawMessage, flags *rootFlags) e
 	if flags.csv {
 		return printCSV(w, data)
 	}
+	// --ndjson: stream as newline-delimited JSON
+	if flags.ndjson {
+		return printNDJSON(w, data)
+	}
 	return printOutput(w, data, flags.asJSON)
 }
 
@@ -394,6 +405,25 @@ func compactObjectFields(obj map[string]any) json.RawMessage {
 	}
 	result, _ := json.Marshal(compact)
 	return result
+}
+
+// printNDJSON streams a JSON array as newline-delimited JSON — one object per
+// line, terminated with a final newline. This is the ndjson format that the
+// `tail` and `watch` commands and any agent harness consuming a long-lived
+// stream prefer over a wrapped array.
+func printNDJSON(w io.Writer, data json.RawMessage) error {
+	var items []json.RawMessage
+	if err := json.Unmarshal(data, &items); err != nil {
+		// Not an array — fall back to single-line JSON.
+		fmt.Fprintln(w, strings.TrimSpace(string(data)))
+		return nil
+	}
+	for _, item := range items {
+		if _, err := fmt.Fprintln(w, strings.TrimSpace(string(item))); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // printCSV renders JSON arrays as CSV with header row.

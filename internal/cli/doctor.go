@@ -8,11 +8,98 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"ga4-pp-cli/internal/client"
 	"ga4-pp-cli/internal/config"
+	"ga4-pp-cli/internal/store"
 	"github.com/spf13/cobra"
 )
+
+// cacheReport is the cache section of the doctor output. It surfaces
+// per-table row counts and per-scope sync_state cursors so an agent can
+// see at a glance whether the local store is empty, partially synced,
+// or stale — without having to run `ga4-pp-cli sql` itself.
+type cacheReport struct {
+	Path            string             `json:"path"`
+	Exists          bool               `json:"exists"`
+	SchemaVersion   int                `json:"schema_version,omitempty"`
+	StoreSchemaWant int                `json:"store_schema_want,omitempty"`
+	RowCounts       map[string]int     `json:"row_counts,omitempty"`
+	Scopes          []cacheScopeReport `json:"scopes,omitempty"`
+	Error           string             `json:"error,omitempty"`
+}
+
+// cacheScopeReport is one (property, scope) cursor entry rendered in
+// human-friendly form: scope name, age of the last run, and how many
+// rows it produced.
+type cacheScopeReport struct {
+	PropertyID string `json:"property_id"`
+	Scope      string `json:"scope"`
+	LastRunAt  string `json:"last_run_at"`
+	AgeSeconds int64  `json:"age_seconds"`
+	LastDate   string `json:"last_date,omitempty"`
+	RowCount   int    `json:"row_count"`
+}
+
+// collectCacheReport reads $PRESS_DATA_DIR/ga4/data.db (read-only) and
+// returns a structured snapshot of cache state. Missing store is not an
+// error — the report records exists=false and the caller can render a
+// hint to run `sync`. Any partial-read failure is captured in the
+// Error field so doctor still emits something agent-parseable.
+func collectCacheReport() cacheReport {
+	path := store.DefaultPath()
+	rep := cacheReport{Path: path}
+
+	if _, err := os.Stat(path); err != nil {
+		// First-run state: the store hasn't been created yet. Render a
+		// hint without an Error tag so the doctor's pass/fail logic
+		// doesn't flag this as a hard failure.
+		rep.Exists = false
+		return rep
+	}
+	rep.Exists = true
+
+	s, err := store.OpenReadOnly(path)
+	if err != nil {
+		rep.Error = fmt.Sprintf("open: %s", err)
+		return rep
+	}
+	defer s.Close()
+
+	if v, err := s.SchemaVersion(); err == nil {
+		rep.SchemaVersion = v
+		rep.StoreSchemaWant = store.StoreSchemaVersion
+	}
+
+	rep.RowCounts = map[string]int{}
+	for _, table := range []string{"properties", "dimensions", "metrics", "pages_daily"} {
+		if n, err := s.TableRowCount(table); err == nil {
+			rep.RowCounts[table] = n
+		}
+	}
+
+	states, err := s.AllSyncStates()
+	if err != nil {
+		rep.Error = strings.TrimSpace(rep.Error + " " + fmt.Sprintf("sync_state: %s", err))
+		return rep
+	}
+	now := time.Now().UTC()
+	for _, st := range states {
+		entry := cacheScopeReport{
+			PropertyID: st.PropertyID,
+			Scope:      st.Scope,
+			LastRunAt:  st.LastRunAt,
+			LastDate:   st.LastDate,
+			RowCount:   st.RowCount,
+		}
+		if t, perr := time.Parse(time.RFC3339, st.LastRunAt); perr == nil {
+			entry.AgeSeconds = int64(now.Sub(t).Seconds())
+		}
+		rep.Scopes = append(rep.Scopes, entry)
+	}
+	return rep
+}
 
 // looksLikeDoctorInterstitial reports whether the response body matches a known
 // bot-detection challenge page (Cloudflare, Akamai, Vercel, AWS WAF, DataDome,
@@ -203,6 +290,11 @@ func newDoctorCmd(flags *rootFlags) *cobra.Command {
 
 			report["version"] = version
 
+			// Cache section: surface local-store row counts and sync_state
+			// cursors so agents can see freshness without invoking `sql`.
+			cache := collectCacheReport()
+			report["cache"] = cache
+
 			if flags.asJSON {
 				if err := printJSONFiltered(cmd.OutOrStdout(), report, flags); err != nil {
 					return err
@@ -260,11 +352,44 @@ func newDoctorCmd(flags *rootFlags) *cobra.Command {
 			if hint, ok := report["auth_hint"]; ok {
 				fmt.Fprintf(w, "  hint: %v\n", hint)
 			}
+			renderCacheReport(w, cache)
 			return doctorExitForFailOn(failOn, report)
 		},
 	}
 	cmd.Flags().StringVar(&failOn, "fail-on", "", "Exit non-zero when a health level is reached: stale, error. Default is never.")
 	return cmd
+}
+
+// renderCacheReport writes the cache section of a human-readable doctor
+// run. Output is intentionally short — one heading, one line per table,
+// and one line per scope cursor. Agents that want richer detail should
+// pass --json and consume the structured `cache` envelope directly.
+func renderCacheReport(w interface {
+	Write([]byte) (int, error)
+}, c cacheReport) {
+	fmt.Fprintln(w, "")
+	fmt.Fprintf(w, "  %s Cache: %s\n", green("OK"), c.Path)
+	if !c.Exists {
+		fmt.Fprintln(w, "    (not initialized — run 'ga4-pp-cli sync schema' to create)")
+		return
+	}
+	if c.Error != "" {
+		fmt.Fprintf(w, "    %s %s\n", yellow("WARN"), c.Error)
+	}
+	if c.StoreSchemaWant != 0 && c.SchemaVersion != c.StoreSchemaWant {
+		fmt.Fprintf(w, "    %s schema_version=%d, binary wants %d (run 'ga4-pp-cli sync schema' to migrate)\n",
+			yellow("WARN"), c.SchemaVersion, c.StoreSchemaWant)
+	}
+	for _, tbl := range []string{"properties", "dimensions", "metrics", "pages_daily"} {
+		if n, ok := c.RowCounts[tbl]; ok {
+			fmt.Fprintf(w, "    %-12s %d rows\n", tbl, n)
+		}
+	}
+	for _, sc := range c.Scopes {
+		age := time.Duration(sc.AgeSeconds) * time.Second
+		fmt.Fprintf(w, "    scope=%-12s property=%-10s age=%-10s rows=%d\n",
+			sc.Scope, sc.PropertyID, age.Truncate(time.Second), sc.RowCount)
+	}
 }
 
 // doctorExitForFailOn returns a non-nil error when the report's worst

@@ -28,11 +28,11 @@ returns per-event counts and conversion rates between adjacent steps.`,
 		Example:     "  ga4-pp-cli reports funnel --steps page_view,sign_up,purchase --date-range 28daysAgo,today --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if stepsCSV == "" {
-				return fmt.Errorf("--steps is required: comma-separated event names in funnel order")
-			}
 			if dryRunOK(flags) {
 				return nil
+			}
+			if stepsCSV == "" {
+				return fmt.Errorf("--steps is required: comma-separated event names in funnel order")
 			}
 			steps := []string{}
 			for _, s := range strings.Split(stepsCSV, ",") {
@@ -127,9 +127,15 @@ returns per-event counts and conversion rates between adjacent steps.`,
 			return printOutputWithFlags(cmd.OutOrStdout(), b, flags)
 		},
 	}
-	cmd.Flags().StringVar(&stepsCSV, "steps", "", "Comma-separated funnel steps (event names in order)")
+	cmd.Flags().StringVar(&stepsCSV, "steps", "", "Comma-separated funnel steps (ordered event names defining the conversion path)")
+	// Next flag, --date-range, picks the date window.
 	cmd.Flags().StringVar(&dateRangeSpec, "date-range", "", "Date range spec, e.g. 7d / 28daysAgo,today / 2026-01-01,2026-01-31")
-	cmd.Flags().StringVar(&property, "property", "", "GA4 property ID (defaults to GA_PROPERTY_ID)")
+	// Final flag, --property, identifies the GA4 source.
+	cmd.Flags().StringVar(&property, "property", "", "GA4 property ID, numeric (defaults to the GA_PROPERTY_ID environment variable)")
+	// --steps has no sensible default and the funnel is meaningless without
+	// it; surface the requirement at the cobra layer so --help renders it
+	// and missing-flag errors arrive before RunE.
+	_ = cmd.MarkFlagRequired("steps")
 	return cmd
 }
 

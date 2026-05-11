@@ -25,6 +25,7 @@ type rootFlags struct {
 	asJSON        bool
 	compact       bool
 	csv           bool
+	ndjson        bool
 	plain         bool
 	quiet         bool
 	dryRun        bool
@@ -105,6 +106,7 @@ See README.md or the bundled SKILL.md for recipes.`,
 	rootCmd.PersistentFlags().BoolVar(&flags.asJSON, "json", false, "Output as JSON")
 	rootCmd.PersistentFlags().BoolVar(&flags.compact, "compact", false, "Return only key fields (id, name, status, timestamps) for minimal token usage")
 	rootCmd.PersistentFlags().BoolVar(&flags.csv, "csv", false, "Output as CSV (table and array responses)")
+	rootCmd.PersistentFlags().BoolVar(&flags.ndjson, "ndjson", false, "Output as newline-delimited JSON (one object per line)")
 	rootCmd.PersistentFlags().BoolVar(&flags.plain, "plain", false, "Output as plain tab-separated text")
 	rootCmd.PersistentFlags().BoolVar(&flags.quiet, "quiet", false, "Bare output, one value per line")
 	rootCmd.PersistentFlags().StringVar(&flags.configPath, "config", "", "Config file path")
@@ -184,6 +186,10 @@ See README.md or the bundled SKILL.md for recipes.`,
 		default:
 			return fmt.Errorf("invalid --data-source value %q: must be auto, live, or local", flags.dataSource)
 		}
+		// Auto-refresh policy: fires only under --data-source auto and only
+		// when the local cache for the running command's scope is older than
+		// defaultStaleAge. See auto_refresh.go for the full carve-out list.
+		autoRefreshIfStale(cmd, flags)
 		return nil
 	}
 	rootCmd.AddCommand(newPropertiesCmd(flags))
@@ -198,13 +204,18 @@ See README.md or the bundled SKILL.md for recipes.`,
 	rootCmd.AddCommand(newTemplatesCmd(flags))
 	rootCmd.AddCommand(newDriftCmd(flags))
 	rootCmd.AddCommand(newWatchCmd(flags))
-	// Local data layer: SQLite-backed sync + search + raw SQL.
+	// Local data layer: SQLite-backed sync + search + export + raw SQL.
 	rootCmd.AddCommand(newSyncCmd(flags))
 	rootCmd.AddCommand(newSearchCmd(flags))
 	rootCmd.AddCommand(newSQLCmd(flags))
-	// Compound commands that mine pages_daily for signals.
+	rootCmd.AddCommand(newExportCmd(flags))
+	rootCmd.AddCommand(newTailCmd(flags))
+	rootCmd.AddCommand(newAnalyticsCmd(flags))
+	// Compound commands also exposed at top level for back-compat with prior CLI versions.
 	rootCmd.AddCommand(newTrafficAnomaliesCmd(flags))
 	rootCmd.AddCommand(newBotTrafficCmd(flags))
+	rootCmd.AddCommand(newHealthCmd(flags))
+	rootCmd.AddCommand(newTrendsCmd(flags))
 	rootCmd.AddCommand(newDoctorCmd(flags))
 	rootCmd.AddCommand(newAuthCmd(flags))
 	rootCmd.AddCommand(newAgentContextCmd(rootCmd))
@@ -212,6 +223,33 @@ See README.md or the bundled SKILL.md for recipes.`,
 	rootCmd.AddCommand(newFeedbackCmd(flags))
 	rootCmd.AddCommand(newWhichCmd(flags))
 	rootCmd.AddCommand(newImportCmd(flags))
+	// Admin API mirrors: read-only configuration surface for property auditing.
+	// Each command is a thin wrapper over an Admin API list/get endpoint so
+	// agents can answer "is X configured?" questions without leaving the CLI.
+	rootCmd.AddCommand(newCustomDimensionsCmd(flags))
+	rootCmd.AddCommand(newCustomMetricsCmd(flags))
+	rootCmd.AddCommand(newDataStreamsCmd(flags))
+	rootCmd.AddCommand(newKeyEventsCmd(flags))
+	rootCmd.AddCommand(newGoogleAdsLinksCmd(flags))
+	rootCmd.AddCommand(newFirebaseLinksCmd(flags))
+	rootCmd.AddCommand(newAudiencesCmd(flags))
+	rootCmd.AddCommand(newChannelGroupsCmd(flags))
+	rootCmd.AddCommand(newAttributionSettingsCmd(flags))
+	rootCmd.AddCommand(newDataRetentionCmd(flags))
+	rootCmd.AddCommand(newBigQueryLinksCmd(flags))
+	rootCmd.AddCommand(newDisplayVideo360LinksCmd(flags))
+	rootCmd.AddCommand(newSearchAds360LinksCmd(flags))
+	rootCmd.AddCommand(newAdSenseLinksCmd(flags))
+	rootCmd.AddCommand(newExpandedDataSetsCmd(flags))
+	rootCmd.AddCommand(newEventCreateRulesCmd(flags))
+	rootCmd.AddCommand(newMeasurementProtocolSecretsCmd(flags))
+	rootCmd.AddCommand(newCalculatedMetricsCmd(flags))
+	rootCmd.AddCommand(newEnhancedMeasurementCmd(flags))
+	rootCmd.AddCommand(newSubpropertyEventFiltersCmd(flags))
+	rootCmd.AddCommand(newRollupPropertySourceLinksCmd(flags))
+	rootCmd.AddCommand(newConversionValuesCmd(flags))
+	rootCmd.AddCommand(newAccessBindingsCmd(flags))
+	rootCmd.AddCommand(newJobsCmd(flags))
 	rootCmd.AddCommand(newVersionCliCmd())
 
 	return rootCmd

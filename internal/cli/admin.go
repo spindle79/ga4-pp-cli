@@ -164,7 +164,8 @@ propertyId to any Data API command via --property.`,
 			return printOutputWithFlags(cmd.OutOrStdout(), out, flags)
 		},
 	}
-	cmd.Flags().IntVar(&pageSize, "page-size", 0, "Max account summaries per page (0 = API default)")
+	cmd.Flags().IntVar(&pageSize, "page-size", 0, "Maximum number of account summaries returned per response page (0 = API default)")
+	// Second flag, --ids-only, controls projection shape.
 	cmd.Flags().BoolVar(&includePropertyIds, "ids-only", false, "Flatten to {propertyId, propertyName, account} rows for direct agent consumption")
 	return cmd
 }

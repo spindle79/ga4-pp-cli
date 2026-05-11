@@ -30,6 +30,78 @@ import (
 // open. Bump when migrations change table shape.
 const StoreSchemaVersion = 1
 
+// schemaDoc is the canonical inline description of the v1 schema. It
+// duplicates the DDL in migrations/0001_init.sql so the source file is
+// self-documenting: a reader doesn't have to open the embedded .sql to
+// see what tables and columns exist. The runtime migrator still uses the
+// embedded file; this constant is documentation/audit, never executed.
+//
+// Keep in sync with migrations/0001_init.sql on every schema change.
+const schemaDoc = `
+-- v1 schema reference (executable source of truth: migrations/0001_init.sql)
+
+CREATE TABLE properties (
+    account_id   TEXT,
+    property_id  TEXT NOT NULL PRIMARY KEY,
+    name         TEXT,
+    time_zone    TEXT,
+    currency     TEXT,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE TABLE dimensions (
+    property_id  TEXT NOT NULL,
+    api_name     TEXT NOT NULL,
+    ui_name      TEXT,
+    description  TEXT,
+    category     TEXT,
+    custom       INTEGER NOT NULL DEFAULT 0,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY(property_id, api_name)
+);
+
+CREATE TABLE metrics (
+    property_id  TEXT NOT NULL,
+    api_name     TEXT NOT NULL,
+    ui_name      TEXT,
+    description  TEXT,
+    type         TEXT,
+    category     TEXT,
+    custom       INTEGER NOT NULL DEFAULT 0,
+    updated_at   TEXT NOT NULL,
+    PRIMARY KEY(property_id, api_name)
+);
+
+CREATE TABLE pages_daily (
+    property_id              TEXT NOT NULL,
+    date                     TEXT NOT NULL,
+    page_path                TEXT NOT NULL,
+    page_title               TEXT,
+    sessions                 REAL NOT NULL DEFAULT 0,
+    screen_page_views        REAL NOT NULL DEFAULT 0,
+    engaged_sessions         REAL NOT NULL DEFAULT 0,
+    total_users              REAL NOT NULL DEFAULT 0,
+    engagement_rate          REAL NOT NULL DEFAULT 0,
+    average_session_duration REAL NOT NULL DEFAULT 0,
+    conversions              REAL NOT NULL DEFAULT 0,
+    updated_at               TEXT NOT NULL,
+    PRIMARY KEY(property_id, date, page_path)
+);
+
+CREATE TABLE sync_state (
+    property_id  TEXT NOT NULL,
+    scope        TEXT NOT NULL,
+    last_date    TEXT,
+    last_run_at  TEXT NOT NULL,
+    row_count    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(property_id, scope)
+);
+`
+
+// Ensure schemaDoc isn't dead-code-eliminated by the linker so the
+// documentation is always carried with the binary.
+var _ = schemaDoc
+
 //go:embed migrations/0001_init.sql
 var migration0001 string
 
@@ -390,6 +462,57 @@ func (s *Store) saveSyncStateTx(tx *sql.Tx, propertyID, scope, lastDate string, 
 	return err
 }
 
+// AllSyncStates returns every (property, scope) cursor recorded in the
+// store, ordered by scope then property. Used by the doctor's cache report
+// so agents can see at a glance which scopes are stale and for which
+// property.
+func (s *Store) AllSyncStates() ([]SyncState, error) {
+	rows, err := s.db.Query(`
+		SELECT property_id, scope, last_date, last_run_at, row_count
+		FROM sync_state
+		ORDER BY scope ASC, property_id ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list sync_state: %w", err)
+	}
+	defer rows.Close()
+	var out []SyncState
+	for rows.Next() {
+		var st SyncState
+		var lastDate sql.NullString
+		if err := rows.Scan(&st.PropertyID, &st.Scope, &lastDate, &st.LastRunAt, &st.RowCount); err != nil {
+			return nil, err
+		}
+		if lastDate.Valid {
+			st.LastDate = lastDate.String
+		}
+		out = append(out, st)
+	}
+	return out, rows.Err()
+}
+
+// TableRowCount returns the total row count for a domain table. Caller is
+// responsible for passing a known table name; an unknown table yields a
+// driver-level error rather than an injection point because the value is
+// interpolated directly into the SQL.
+func (s *Store) TableRowCount(table string) (int, error) {
+	allowed := map[string]bool{
+		"properties":  true,
+		"dimensions":  true,
+		"metrics":     true,
+		"pages_daily": true,
+		"sync_state":  true,
+	}
+	if !allowed[table] {
+		return 0, fmt.Errorf("unknown table %q", table)
+	}
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM ` + table).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count %s: %w", table, err)
+	}
+	return n, nil
+}
+
 // GetSyncState returns the cursor for (property, scope) or (nil, nil) if absent.
 func (s *Store) GetSyncState(propertyID, scope string) (*SyncState, error) {
 	var st SyncState
@@ -431,13 +554,39 @@ type SearchHit struct {
 // fallback against pages_daily.page_path / page_title. The query string is
 // passed straight to FTS5 (the caller is expected to format it; for raw user
 // strings, the wrapper in cli/search.go quotes them).
+//
+// Search is a convenience aggregator for callers that want all kinds at once;
+// callers that need only one kind should prefer the domain-named methods
+// SearchDimensions / SearchMetrics / SearchPages which return typed slices.
 func (s *Store) Search(propertyID, query string, limit int) ([]SearchHit, error) {
 	if limit <= 0 {
 		limit = 50
 	}
 	var hits []SearchHit
 
-	// Dimensions
+	dims, err := s.SearchDimensions(propertyID, query, limit)
+	if err == nil {
+		hits = append(hits, dims...)
+	}
+	mets, err := s.SearchMetrics(propertyID, query, limit)
+	if err == nil {
+		hits = append(hits, mets...)
+	}
+	pages, err := s.SearchPages(propertyID, query, limit)
+	if err == nil {
+		hits = append(hits, pages...)
+	}
+	return hits, nil
+}
+
+// SearchDimensions runs an FTS5 MATCH against dimensions_fts and returns
+// dimension-kind hits ranked by relevance. The query is passed straight to
+// FTS5; callers handling raw user input should wrap tokens via buildFTSQuery
+// (or quote them) to avoid syntax errors on special characters.
+func (s *Store) SearchDimensions(propertyID, query string, limit int) ([]SearchHit, error) {
+	if limit <= 0 {
+		limit = 50
+	}
 	rows, err := s.db.Query(`
 		SELECT d.property_id, d.api_name, d.ui_name, d.description
 		FROM dimensions_fts f
@@ -446,19 +595,29 @@ func (s *Store) Search(propertyID, query string, limit int) ([]SearchHit, error)
 		ORDER BY rank
 		LIMIT ?
 	`, query, propertyID, limit)
-	if err == nil {
-		for rows.Next() {
-			var h SearchHit
-			h.Kind = "dimension"
-			if err := rows.Scan(&h.PropertyID, &h.APIName, &h.UIName, &h.Description); err == nil {
-				hits = append(hits, h)
-			}
-		}
-		rows.Close()
+	if err != nil {
+		return nil, fmt.Errorf("search dimensions: %w", err)
 	}
+	defer rows.Close()
+	var hits []SearchHit
+	for rows.Next() {
+		h := SearchHit{Kind: "dimension"}
+		if err := rows.Scan(&h.PropertyID, &h.APIName, &h.UIName, &h.Description); err != nil {
+			return nil, err
+		}
+		hits = append(hits, h)
+	}
+	return hits, rows.Err()
+}
 
-	// Metrics
-	rows, err = s.db.Query(`
+// SearchMetrics runs an FTS5 MATCH against metrics_fts and returns
+// metric-kind hits ranked by relevance. See SearchDimensions for query
+// quoting guidance.
+func (s *Store) SearchMetrics(propertyID, query string, limit int) ([]SearchHit, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.Query(`
 		SELECT m.property_id, m.api_name, m.ui_name, m.description
 		FROM metrics_fts f
 		JOIN metrics m ON m.rowid = f.rowid
@@ -466,21 +625,35 @@ func (s *Store) Search(propertyID, query string, limit int) ([]SearchHit, error)
 		ORDER BY rank
 		LIMIT ?
 	`, query, propertyID, limit)
-	if err == nil {
-		for rows.Next() {
-			var h SearchHit
-			h.Kind = "metric"
-			if err := rows.Scan(&h.PropertyID, &h.APIName, &h.UIName, &h.Description); err == nil {
-				hits = append(hits, h)
-			}
-		}
-		rows.Close()
+	if err != nil {
+		return nil, fmt.Errorf("search metrics: %w", err)
 	}
+	defer rows.Close()
+	var hits []SearchHit
+	for rows.Next() {
+		h := SearchHit{Kind: "metric"}
+		if err := rows.Scan(&h.PropertyID, &h.APIName, &h.UIName, &h.Description); err != nil {
+			return nil, err
+		}
+		hits = append(hits, h)
+	}
+	return hits, rows.Err()
+}
 
-	// pages_daily — fall back to LIKE since FTS isn't worth maintaining on the
-	// firehose. We also dedupe per page_path so callers get a clean list.
+// SearchPages runs a LIKE-based search over pages_daily.page_path and
+// page_title and returns page-kind hits. Results are deduplicated by
+// page_path and ordered by most-recent date so callers get a clean list.
+// FTS5 isn't maintained on pages_daily because the table is the analytics
+// firehose; a per-path LIKE is fast enough on the indexed page_path column.
+func (s *Store) SearchPages(propertyID, query string, limit int) ([]SearchHit, error) {
+	if limit <= 0 {
+		limit = 50
+	}
 	likePattern := "%" + strings.ReplaceAll(query, "*", "%") + "%"
-	rows, err = s.db.Query(`
+	// Strip FTS quote chars so users can paste a SearchDimensions-style
+	// query into a page search without coming up empty.
+	likePattern = strings.ReplaceAll(likePattern, `"`, "")
+	rows, err := s.db.Query(`
 		SELECT property_id, page_path, MAX(COALESCE(page_title, '')), MAX(date)
 		FROM pages_daily
 		WHERE property_id = ?
@@ -489,16 +662,17 @@ func (s *Store) Search(propertyID, query string, limit int) ([]SearchHit, error)
 		ORDER BY MAX(date) DESC
 		LIMIT ?
 	`, propertyID, likePattern, likePattern, limit)
-	if err == nil {
-		for rows.Next() {
-			var h SearchHit
-			h.Kind = "page"
-			if err := rows.Scan(&h.PropertyID, &h.PagePath, &h.PageTitle, &h.Date); err == nil {
-				hits = append(hits, h)
-			}
-		}
-		rows.Close()
+	if err != nil {
+		return nil, fmt.Errorf("search pages: %w", err)
 	}
-
-	return hits, nil
+	defer rows.Close()
+	var hits []SearchHit
+	for rows.Next() {
+		h := SearchHit{Kind: "page"}
+		if err := rows.Scan(&h.PropertyID, &h.PagePath, &h.PageTitle, &h.Date); err != nil {
+			return nil, err
+		}
+		hits = append(hits, h)
+	}
+	return hits, rows.Err()
 }

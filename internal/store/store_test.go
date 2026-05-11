@@ -142,6 +142,59 @@ func TestUpsertPagesDaily(t *testing.T) {
 	}
 }
 
+func TestSearchPagesAndDomainMethods(t *testing.T) {
+	s := tempStore(t)
+	property := "12345"
+
+	// Seed pages_daily with a few rows whose paths/titles differ.
+	pages := []PageDaily{
+		{PropertyID: property, Date: "2026-05-01", PagePath: "/blog/intro", PageTitle: "Intro post", Sessions: 50},
+		{PropertyID: property, Date: "2026-05-02", PagePath: "/blog/intro", PageTitle: "Intro post", Sessions: 60},
+		{PropertyID: property, Date: "2026-05-01", PagePath: "/pricing", PageTitle: "Pricing page", Sessions: 30},
+	}
+	if _, err := s.UpsertPagesDaily(pages); err != nil {
+		t.Fatalf("UpsertPagesDaily: %v", err)
+	}
+	// Seed dimensions + metrics so the domain methods have non-empty
+	// universes to match against.
+	if _, err := s.UpsertDimensions(property, []SchemaEntry{
+		{APIName: "pagePath", UIName: "Page path", Description: "URL path of the page"},
+		{APIName: "country", UIName: "Country", Description: "Country of the user"},
+	}); err != nil {
+		t.Fatalf("UpsertDimensions: %v", err)
+	}
+	if _, err := s.UpsertMetrics(property, []SchemaEntry{
+		{APIName: "sessions", UIName: "Sessions", Description: "Total sessions"},
+		{APIName: "engagementRate", UIName: "Engagement rate", Description: "Rate of engaged sessions"},
+	}); err != nil {
+		t.Fatalf("UpsertMetrics: %v", err)
+	}
+
+	pageHits, err := s.SearchPages(property, "blog", 10)
+	if err != nil {
+		t.Fatalf("SearchPages: %v", err)
+	}
+	if len(pageHits) == 0 || pageHits[0].PagePath != "/blog/intro" {
+		t.Fatalf("SearchPages: want /blog/intro, got %#v", pageHits)
+	}
+
+	dimHits, err := s.SearchDimensions(property, `"page"`, 10)
+	if err != nil {
+		t.Fatalf("SearchDimensions: %v", err)
+	}
+	if len(dimHits) == 0 || dimHits[0].APIName != "pagePath" {
+		t.Fatalf("SearchDimensions: want pagePath in results, got %#v", dimHits)
+	}
+
+	mHits, err := s.SearchMetrics(property, `"engag"*`, 10)
+	if err != nil {
+		t.Fatalf("SearchMetrics: %v", err)
+	}
+	if len(mHits) == 0 {
+		t.Fatalf("SearchMetrics: want a hit for engag*, got %#v", mHits)
+	}
+}
+
 func TestSQLReadOnly(t *testing.T) {
 	s := tempStore(t)
 	// Seed a row so SELECT has something to return.

@@ -158,6 +158,89 @@ These capabilities aren't available in any other tool for this API.
   ga4-pp-cli templates compat weekly-content --agent
   ```
 
+## Cookbook
+
+Each recipe is a self-contained agent workflow. Commands run as-is once
+`GOOGLE_APPLICATION_CREDENTIALS` and (optionally) `GA_PROPERTY_ID` are set.
+
+1. **Discover every property the service account can see.**
+
+   ```bash
+   ga4-pp-cli accounts summaries --ids-only --agent
+   ```
+
+2. **Find the right metric without guessing the apiName.**
+
+   ```bash
+   ga4-pp-cli sync schema 12345 --agent
+   ga4-pp-cli schema search "engagement rate" --agent
+   ```
+
+3. **Top 20 pages over the last 7 days.**
+
+   ```bash
+   ga4-pp-cli pages views / --timeframe last-7-days --top 20 --agent
+   ```
+
+4. **Detect a traffic anomaly today vs the 30-day baseline.**
+
+   ```bash
+   ga4-pp-cli sync pages 12345 --days 30 --agent
+   ga4-pp-cli traffic-anomalies --days 30 --threshold 2.0 --agent
+   ```
+
+5. **Spot bot or scraper traffic in the last week.**
+
+   ```bash
+   ga4-pp-cli bot-traffic --days 7 --agent
+   ```
+
+6. **Watch realtime during a product launch.**
+
+   ```bash
+   ga4-pp-cli watch realtime --interval 30s --top 10 --agent
+   ```
+
+7. **Schedule a weekly content review with a saved template.**
+
+   ```bash
+   ga4-pp-cli templates save weekly-content --dimensions pagePath,pageTitle --metrics sessions,engagementRate
+   ga4-pp-cli templates run weekly-content --agent
+   ```
+
+8. **Period-over-period drift report for top pages.**
+
+   ```bash
+   ga4-pp-cli drift pages --window 7d --top 20 --agent
+   ```
+
+9. **Export pages_daily to a CSV for a spreadsheet review.**
+
+   ```bash
+   ga4-pp-cli export --table pages_daily --csv > pages.csv
+   ```
+
+10. **Run an ad-hoc SQL aggregate against the synced store.**
+
+    ```bash
+    ga4-pp-cli sql "SELECT page_path, SUM(sessions) FROM pages_daily GROUP BY 1 ORDER BY 2 DESC LIMIT 10" --agent
+    ```
+
+11. **Audit configuration before debugging a missing-data report.**
+
+    ```bash
+    ga4-pp-cli data-streams 12345 --agent
+    ga4-pp-cli key-events 12345 --agent
+    ga4-pp-cli attribution-settings 12345 --agent
+    ```
+
+12. **Submit a 90-day report job and pick up the result later.**
+
+    ```bash
+    JOB=$(ga4-pp-cli jobs submit 12345 --days 90 --agent | jq -r .id)
+    ga4-pp-cli jobs wait "$JOB" --timeout 5m --agent
+    ```
+
 ## Usage
 
 Run `ga4-pp-cli --help` for the full command reference and flag list.

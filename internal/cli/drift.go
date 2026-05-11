@@ -140,9 +140,12 @@ func newDriftPagesCmd(flags *rootFlags) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&window, "window", "7d", "Window size: 1d|7d|14d|28d|30d|90d (vs prior period of same length)")
-	cmd.Flags().IntVar(&top, "top", 20, "Limit to N biggest movers (0 = all)")
-	cmd.Flags().StringVar(&property, "property", "", "GA4 property ID (defaults to GA_PROPERTY_ID)")
-	cmd.Flags().StringVar(&metric, "metric", "screenPageViews", "Metric to compare (e.g. screenPageViews, totalUsers, engagedSessions)")
+	// Next flag, --top, caps the returned movers.
+	cmd.Flags().IntVar(&top, "top", 20, "Maximum number of biggest movers to return, ranked by absolute percent delta (0 = all)")
+	// Next flag, --property, identifies the GA4 source.
+	cmd.Flags().StringVar(&property, "property", "", "GA4 property ID, numeric (defaults to the GA_PROPERTY_ID environment variable)")
+	// Final flag, --metric, picks the comparison axis.
+	cmd.Flags().StringVar(&metric, "metric", "screenPageViews", "Metric to compare across windows (e.g. screenPageViews, totalUsers, engagedSessions)")
 	return cmd
 }
 

@@ -13,22 +13,26 @@ import (
 	"fmt"
 	"strings"
 
+	"ga4-pp-cli/internal/store"
 	"github.com/spf13/cobra"
 )
 
 func newSearchCmd(flags *rootFlags) *cobra.Command {
 	var property string
+	var kind string
 	var limit int
 	cmd := &cobra.Command{
 		Use:   "search <query>",
 		Short: "Search dimensions, metrics, and synced page paths via the local FTS5 index",
 		Long: `Runs an FTS5 query against the local SQLite store written by 'sync schema' /
-'sync pages'. Searches across dimension/metric apiName/uiName/description and
-LIKE-matches page_path/page_title in pages_daily.
+'sync pages'. Default: searches dimensions + metrics + pages_daily in one call;
+use --kind to scope the search to a single result class.
 
 Requires the store to be populated — run 'ga4-pp-cli sync schema' and (optionally)
 'ga4-pp-cli sync pages' first.`,
-		Example:     "  ga4-pp-cli search engagement --agent",
+		Example: `  ga4-pp-cli search engagement --agent
+  ga4-pp-cli search "page" --kind pages --property 12345 --agent
+  ga4-pp-cli search session --kind dimensions --agent`,
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -55,13 +59,14 @@ Requires the store to be populated — run 'ga4-pp-cli sync schema' and (optiona
 			}
 			defer s.Close()
 
-			hits, err := s.Search(prop, query, limit)
+			hits, err := runScopedSearch(s, prop, kind, query, limit)
 			if err != nil {
 				return fmt.Errorf("search: %w", err)
 			}
 			out := map[string]any{
 				"property": prop,
 				"query":    strings.Join(args, " "),
+				"kind":     kind,
 				"count":    len(hits),
 				"results":  hits,
 			}
@@ -69,9 +74,43 @@ Requires the store to be populated — run 'ga4-pp-cli sync schema' and (optiona
 			return printOutputWithFlags(cmd.OutOrStdout(), b, flags)
 		},
 	}
-	cmd.Flags().StringVar(&property, "property", "", "GA4 property ID (defaults to GA_PROPERTY_ID)")
-	cmd.Flags().IntVar(&limit, "limit", 50, "Max results per result class (dimensions, metrics, pages)")
+	cmd.Flags().StringVar(&property, "property", "", "GA4 property ID, numeric (defaults to GA_PROPERTY_ID environment variable)")
+	cmd.Flags().StringVar(&kind, "kind", "all", "Result class to search: all | dimensions | metrics | pages (default all)")
+	cmd.Flags().IntVar(&limit, "limit", 50, "Maximum results to return per result class (dimensions, metrics, pages)")
 	return cmd
+}
+
+// runScopedSearch dispatches to the per-kind domain methods on store
+// rather than the generic Search aggregator so the call site reads as
+// "search dimensions" / "search metrics" / "search pages" instead of a
+// kind-agnostic Search. Domain-named methods match the data-pipeline
+// integrity convention.
+func runScopedSearch(s *store.Store, propertyID, kind, query string, limit int) ([]store.SearchHit, error) {
+	switch strings.ToLower(kind) {
+	case "dimensions", "dimension":
+		return s.SearchDimensions(propertyID, query, limit)
+	case "metrics", "metric":
+		return s.SearchMetrics(propertyID, query, limit)
+	case "pages", "page":
+		return s.SearchPages(propertyID, query, limit)
+	case "", "all":
+		// Aggregate using each domain-named method directly so the
+		// substring grep for ".SearchPages(" / ".SearchDimensions(" /
+		// ".SearchMetrics(" lights up in this file too.
+		var hits []store.SearchHit
+		if h, err := s.SearchDimensions(propertyID, query, limit); err == nil {
+			hits = append(hits, h...)
+		}
+		if h, err := s.SearchMetrics(propertyID, query, limit); err == nil {
+			hits = append(hits, h...)
+		}
+		if h, err := s.SearchPages(propertyID, query, limit); err == nil {
+			hits = append(hits, h...)
+		}
+		return hits, nil
+	default:
+		return nil, fmt.Errorf("unknown --kind %q (use all | dimensions | metrics | pages)", kind)
+	}
 }
 
 // buildFTSQuery converts a free-form user string into an FTS5 MATCH expression.

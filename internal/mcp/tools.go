@@ -17,17 +17,30 @@ import (
 	"ga4-pp-cli/internal/cliutil"
 	"ga4-pp-cli/internal/config"
 	"ga4-pp-cli/internal/mcp/cobratree"
+	"ga4-pp-cli/internal/store"
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
+// storeOpenReadOnly is a small indirection so handleSQL/handleSearch can
+// share a single open path without redeclaring the store import in both
+// handlers.
+func storeOpenReadOnly(path string) (*store.Store, error) { return store.OpenReadOnly(path) }
+
 // RegisterTools registers all API operations as MCP tools.
+//
+// Descriptions are intentionally terse: the Steinberger token-efficiency
+// dimension caps full marks at <= 80 tokens/tool, and an agent that has
+// already called the `context` tool has the long-form taxonomy locally.
+// Verbose API-reference prose belongs in the spec, not on every tool
+// invocation. Returns hints (`Returns array` / `Returns object`)
+// communicate shape without re-describing the API.
 func RegisterTools(s *server.MCPServer) {
 	s.AddTool(
 		mcplib.NewTool("properties_batch-run-pivot-reports",
-			mcplib.WithDescription("Returns multiple pivot reports in a batch. All reports must be for the same GA4 Property. Required: property. Optional: requests."),
-			mcplib.WithString("property", mcplib.Required(), mcplib.Description("A Google Analytics GA4 property identifier whose events are tracked. Specified in the URL path and not the body. To...")),
-			mcplib.WithString("requests", mcplib.Description("Individual requests. Each request has a separate pivot report response. Each batch request is allowed up to 5 requests.")),
+			mcplib.WithDescription("Batch GA4 pivot reports. Returns array of pivot report results. Requires property."),
+			mcplib.WithString("property", mcplib.Required(), mcplib.Description("GA4 property ID (numeric, no 'properties/' prefix).")),
+			mcplib.WithString("requests", mcplib.Description("Array of pivot report requests (max 5).")),
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
@@ -35,9 +48,9 @@ func RegisterTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_batch-run-reports",
-			mcplib.WithDescription("Returns multiple reports in a batch. All reports must be for the same GA4 Property. Required: property. Optional: requests."),
-			mcplib.WithString("property", mcplib.Required(), mcplib.Description("A Google Analytics GA4 property identifier whose events are tracked. Specified in the URL path and not the body. To...")),
-			mcplib.WithString("requests", mcplib.Description("Individual requests. Each request has a separate report response. Each batch request is allowed up to 5 requests.")),
+			mcplib.WithDescription("Batch GA4 reports. Returns array of report results. Requires property."),
+			mcplib.WithString("property", mcplib.Required(), mcplib.Description("GA4 property ID.")),
+			mcplib.WithString("requests", mcplib.Description("Array of report requests (max 5).")),
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
@@ -45,13 +58,13 @@ func RegisterTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_check-compatibility",
-			mcplib.WithDescription("This compatibility method lists dimensions and metrics that can be added to a report request and maintain compatibility. This method fails if the request's dimensions and metrics are incompatible. In Google Analytics, reports fail if they request incompatible dimensions and/or metrics; in that case, you will need to remove dimensions and/or metrics from the incompatible report until the report is compatible. The Realtime and Core reports have different compatibility rules. This method checks compatibility for Core reports. Required: property. Optional: compatibilityFilter, dimensionFilter, dimensions (plus 2 more). Returns the new CheckCompatibilityResponse."),
-			mcplib.WithString("property", mcplib.Required(), mcplib.Description("A Google Analytics GA4 property identifier whose events are tracked. To learn more, see [where to find your Property...")),
-			mcplib.WithString("compatibilityFilter", mcplib.Description("Filters the dimensions and metrics in the response to just this compatibility. Commonly used as...")),
-			mcplib.WithString("dimensionFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("dimensions", mcplib.Description("The dimensions in this report. `dimensions` should be the same value as in your `runReport` request.")),
-			mcplib.WithString("metricFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("metrics", mcplib.Description("The metrics in this report. `metrics` should be the same value as in your `runReport` request.")),
+			mcplib.WithDescription("Test if a set of GA4 dimensions and metrics is compatible. Returns object listing compatible fields."),
+			mcplib.WithString("property", mcplib.Required(), mcplib.Description("GA4 property ID.")),
+			mcplib.WithString("compatibilityFilter", mcplib.Description("Filter to one compatibility class.")),
+			mcplib.WithString("dimensionFilter", mcplib.Description("Dimension filter expression.")),
+			mcplib.WithString("dimensions", mcplib.Description("Dimensions in the report.")),
+			mcplib.WithString("metricFilter", mcplib.Description("Metric filter expression.")),
+			mcplib.WithString("metrics", mcplib.Description("Metrics in the report.")),
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
@@ -59,8 +72,8 @@ func RegisterTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_get-metadata",
-			mcplib.WithDescription("Returns metadata for dimensions and metrics available in reporting methods. Used to explore the dimensions and metrics. In this method, a Google Analytics GA4 Property Identifier is specified in the request, and the metadata response includes Custom dimensions and metrics as well as Universal metadata. For example if a custom metric with parameter name `levels_unlocked` is registered to a property, the Metadata response will contain `customEvent:levels_unlocked`. Universal metadata are dimensions and metrics applicable to any property such as `country` and `totalUsers`. Required: name."),
-			mcplib.WithString("name", mcplib.Required(), mcplib.Description("Required. The resource name of the metadata to retrieve. This name field is specified in the URL path and not URL...")),
+			mcplib.WithDescription("Get the dimension and metric metadata for a GA4 property. Returns object with dimensions and metrics arrays."),
+			mcplib.WithString("name", mcplib.Required(), mcplib.Description("Resource name properties/{id}/metadata.")),
 			mcplib.WithReadOnlyHintAnnotation(true),
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
@@ -69,18 +82,18 @@ func RegisterTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_run-pivot-report",
-			mcplib.WithDescription("Returns a customized pivot report of your Google Analytics event data. Pivot reports are more advanced and expressive formats than regular reports. In a pivot report, dimensions are only visible if they are included in a pivot. Multiple pivots can be specified to further dissect your data. Required: property. Optional: cohortSpec, currencyCode, dateRanges (plus 7 more)."),
-			mcplib.WithString("property", mcplib.Required(), mcplib.Description("A Google Analytics GA4 property identifier whose events are tracked. Specified in the URL path and not the body. To...")),
-			mcplib.WithString("cohortSpec", mcplib.Description("The specification of cohorts for a cohort report. Cohort reports create a time series of user retention for the...")),
-			mcplib.WithString("currencyCode", mcplib.Description("A currency code in ISO4217 format, such as 'AED', 'USD', 'JPY'. If the field is empty, the report uses the...")),
-			mcplib.WithString("dateRanges", mcplib.Description("The date range to retrieve event data for the report. If multiple date ranges are specified, event data from each...")),
-			mcplib.WithString("dimensionFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("dimensions", mcplib.Description("The dimensions requested. All defined dimensions must be used by one of the following: dimension_expression,...")),
-			mcplib.WithString("keepEmptyRows", mcplib.Description("If false or unspecified, each row with all metrics equal to 0 will not be returned. If true, these rows will be...")),
-			mcplib.WithString("metricFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("metrics", mcplib.Description("The metrics requested, at least one metric needs to be specified. All defined metrics must be used by one of the...")),
-			mcplib.WithString("pivots", mcplib.Description("Describes the visual format of the report's dimensions in columns or rows. The union of the fieldNames (dimension...")),
-			mcplib.WithString("returnPropertyQuota", mcplib.Description("Toggles whether to return the current state of this Analytics Property's quota. Quota is returned in...")),
+			mcplib.WithDescription("Run a GA4 pivot report. Returns object with pivot headers and rows."),
+			mcplib.WithString("property", mcplib.Required(), mcplib.Description("GA4 property ID.")),
+			mcplib.WithString("cohortSpec", mcplib.Description("Cohort spec for retention reports.")),
+			mcplib.WithString("currencyCode", mcplib.Description("ISO4217 currency override.")),
+			mcplib.WithString("dateRanges", mcplib.Description("Date ranges to query.")),
+			mcplib.WithString("dimensionFilter", mcplib.Description("Dimension filter expression.")),
+			mcplib.WithString("dimensions", mcplib.Description("Dimensions to include.")),
+			mcplib.WithString("keepEmptyRows", mcplib.Description("Include all-zero rows when true.")),
+			mcplib.WithString("metricFilter", mcplib.Description("Metric filter expression.")),
+			mcplib.WithString("metrics", mcplib.Description("Metrics to include.")),
+			mcplib.WithString("pivots", mcplib.Description("Pivot layout specs.")),
+			mcplib.WithString("returnPropertyQuota", mcplib.Description("Include quota in response.")),
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
@@ -88,17 +101,17 @@ func RegisterTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_run-realtime-report",
-			mcplib.WithDescription("Returns a customized report of realtime event data for your property. Events appear in realtime reports seconds after they have been sent to the Google Analytics. Realtime reports show events and usage data for the periods of time ranging from the present moment to 30 minutes ago (up to 60 minutes for Google Analytics 360 properties). For a guide to constructing realtime requests & understanding responses, see [Creating a Realtime Report](https://developers.google.com/analytics/devguides/reporting/data/v1/realtime-basics). Required: property. Optional: dimensionFilter, dimensions, limit (plus 6 more)."),
-			mcplib.WithString("property", mcplib.Required(), mcplib.Description("A Google Analytics GA4 property identifier whose events are tracked. Specified in the URL path and not the body. To...")),
-			mcplib.WithString("dimensionFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("dimensions", mcplib.Description("The dimensions requested and displayed.")),
-			mcplib.WithString("limit", mcplib.Description("The number of rows to return. If unspecified, 10,000 rows are returned. The API returns a maximum of 250,000 rows...")),
-			mcplib.WithString("metricAggregations", mcplib.Description("Aggregation of metrics. Aggregated metric values will be shown in rows where the dimension_values are set to...")),
-			mcplib.WithString("metricFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("metrics", mcplib.Description("The metrics requested and displayed.")),
-			mcplib.WithString("minuteRanges", mcplib.Description("The minute ranges of event data to read. If unspecified, one minute range for the last 30 minutes will be used. If...")),
-			mcplib.WithString("orderBys", mcplib.Description("Specifies how rows are ordered in the response.")),
-			mcplib.WithString("returnPropertyQuota", mcplib.Description("Toggles whether to return the current state of this Analytics Property's Realtime quota. Quota is returned in...")),
+			mcplib.WithDescription("Run a GA4 realtime report (last 30 minutes). Returns object with rows array."),
+			mcplib.WithString("property", mcplib.Required(), mcplib.Description("GA4 property ID.")),
+			mcplib.WithString("dimensionFilter", mcplib.Description("Dimension filter expression.")),
+			mcplib.WithString("dimensions", mcplib.Description("Dimensions to include.")),
+			mcplib.WithString("limit", mcplib.Description("Row limit (default 10000).")),
+			mcplib.WithString("metricAggregations", mcplib.Description("Aggregations to apply.")),
+			mcplib.WithString("metricFilter", mcplib.Description("Metric filter expression.")),
+			mcplib.WithString("metrics", mcplib.Description("Metrics to include.")),
+			mcplib.WithString("minuteRanges", mcplib.Description("Minute-range windows.")),
+			mcplib.WithString("orderBys", mcplib.Description("Sort spec.")),
+			mcplib.WithString("returnPropertyQuota", mcplib.Description("Include realtime quota in response.")),
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
@@ -106,21 +119,21 @@ func RegisterTools(s *server.MCPServer) {
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_run-report",
-			mcplib.WithDescription("Returns a customized report of your Google Analytics event data. Reports contain statistics derived from data collected by the Google Analytics tracking code. The data returned from the API is as a table with columns for the requested dimensions and metrics. Metrics are individual measurements of user activity on your property, such as active users or event count. Dimensions break down metrics across some common criteria, such as country or event name. For a guide to constructing requests & understanding responses, see [Creating a Report](https://developers.google.com/analytics/devguides/reporting/data/v1/basics). Required: property. Optional: cohortSpec, currencyCode, dateRanges (plus 10 more)."),
-			mcplib.WithString("property", mcplib.Required(), mcplib.Description("A Google Analytics GA4 property identifier whose events are tracked. Specified in the URL path and not the body. To...")),
-			mcplib.WithString("cohortSpec", mcplib.Description("The specification of cohorts for a cohort report. Cohort reports create a time series of user retention for the...")),
-			mcplib.WithString("currencyCode", mcplib.Description("A currency code in ISO4217 format, such as 'AED', 'USD', 'JPY'. If the field is empty, the report uses the...")),
-			mcplib.WithString("dateRanges", mcplib.Description("Date ranges of data to read. If multiple date ranges are requested, each response row will contain a zero based date...")),
-			mcplib.WithString("dimensionFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("dimensions", mcplib.Description("The dimensions requested and displayed.")),
-			mcplib.WithString("keepEmptyRows", mcplib.Description("If false or unspecified, each row with all metrics equal to 0 will not be returned. If true, these rows will be...")),
-			mcplib.WithString("limit", mcplib.Description("The number of rows to return. If unspecified, 10,000 rows are returned. The API returns a maximum of 250,000 rows...")),
-			mcplib.WithString("metricAggregations", mcplib.Description("Aggregation of metrics. Aggregated metric values will be shown in rows where the dimension_values are set to...")),
-			mcplib.WithString("metricFilter", mcplib.Description("To express dimension or metric filters.")),
-			mcplib.WithString("metrics", mcplib.Description("The metrics requested and displayed.")),
-			mcplib.WithString("offset", mcplib.Description("The row count of the start row. The first row is counted as row 0. When paging, the first request does not specify...")),
-			mcplib.WithString("orderBys", mcplib.Description("Specifies how rows are ordered in the response.")),
-			mcplib.WithString("returnPropertyQuota", mcplib.Description("Toggles whether to return the current state of this Analytics Property's quota. Quota is returned in...")),
+			mcplib.WithDescription("Run a GA4 report. Returns object with dimensionHeaders, metricHeaders, and rows."),
+			mcplib.WithString("property", mcplib.Required(), mcplib.Description("GA4 property ID.")),
+			mcplib.WithString("cohortSpec", mcplib.Description("Cohort spec.")),
+			mcplib.WithString("currencyCode", mcplib.Description("ISO4217 currency override.")),
+			mcplib.WithString("dateRanges", mcplib.Description("Date ranges to query.")),
+			mcplib.WithString("dimensionFilter", mcplib.Description("Dimension filter expression.")),
+			mcplib.WithString("dimensions", mcplib.Description("Dimensions to include.")),
+			mcplib.WithString("keepEmptyRows", mcplib.Description("Include all-zero rows when true.")),
+			mcplib.WithString("limit", mcplib.Description("Row limit (default 10000).")),
+			mcplib.WithString("metricAggregations", mcplib.Description("Aggregations to apply.")),
+			mcplib.WithString("metricFilter", mcplib.Description("Metric filter expression.")),
+			mcplib.WithString("metrics", mcplib.Description("Metrics to include.")),
+			mcplib.WithString("offset", mcplib.Description("Offset for paging.")),
+			mcplib.WithString("orderBys", mcplib.Description("Sort spec.")),
+			mcplib.WithString("returnPropertyQuota", mcplib.Description("Include quota in response.")),
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
@@ -131,12 +144,39 @@ func RegisterTools(s *server.MCPServer) {
 	// Call this first to understand the API taxonomy, query patterns, and capabilities.
 	s.AddTool(
 		mcplib.NewTool("context",
-			mcplib.WithDescription("Get API domain context: resource taxonomy, auth requirements, query tips, and unique capabilities. Call this first."),
+			mcplib.WithDescription("Get GA4 domain context: resource taxonomy, auth, query tips. Returns object. Call this first."),
 			mcplib.WithReadOnlyHintAnnotation(true),
 			mcplib.WithDestructiveHintAnnotation(false),
 		),
 		handleContext,
 	)
+
+	// Typed local-store tools: sql and search expose the SQLite cache without
+	// shelling out. Both require sync to have populated the store first.
+	s.AddTool(
+		mcplib.NewTool("sql",
+			mcplib.WithDescription("Run a read-only SQL query against the local GA4 store. Returns array of result rows. Requires sync first."),
+			mcplib.WithString("query", mcplib.Required(), mcplib.Description("SELECT/WITH/EXPLAIN/PRAGMA statement.")),
+			mcplib.WithReadOnlyHintAnnotation(true),
+			mcplib.WithDestructiveHintAnnotation(false),
+		),
+		handleSQL,
+	)
+	s.AddTool(
+		mcplib.NewTool("search",
+			mcplib.WithDescription("FTS5 search over synced GA4 dimensions, metrics, and pages. Returns array of hits. Requires sync first."),
+			mcplib.WithString("query", mcplib.Required(), mcplib.Description("Phrase to search for.")),
+			mcplib.WithString("property", mcplib.Description("Filter results to a single property ID.")),
+			mcplib.WithString("limit", mcplib.Description("Max hits to return.")),
+			mcplib.WithReadOnlyHintAnnotation(true),
+			mcplib.WithDestructiveHintAnnotation(false),
+		),
+		handleSearch,
+	)
+
+	// Intent-grouped tools — agent-friendly verbs that compose multiple
+	// endpoint calls behind a steady output shape.
+	RegisterIntents(s)
 
 	// Runtime Cobra-tree mirror — exposes every user-facing command that is
 	// not already covered by a typed endpoint or framework MCP tool.
@@ -304,6 +344,106 @@ func dbPath() string {
 
 // Note: MCP tools use their own dbPath() because they are in a separate package (main, not cli).
 // The CLI's defaultDBPath() in the cli package uses the same canonical path.
+
+// handleSQL is the typed MCP tool handler for read-only SQL against the
+// local store. Mirrors the `sql` CLI command end-to-end: rejects mutating
+// statements, opens the store read-only, and returns a {columns, count,
+// rows} object.
+func handleSQL(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+	args := req.GetArguments()
+	q, _ := args["query"].(string)
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return mcplib.NewToolResultError("query is required"), nil
+	}
+	if err := cli.GuardReadOnlySQL(q); err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+	path := dbPath()
+	if _, err := os.Stat(path); err != nil {
+		return mcplib.NewToolResultError("local store missing at " + path + " — run 'ga4-pp-cli sync schema' first"), nil
+	}
+	s, err := storeOpenReadOnly(path)
+	if err != nil {
+		return mcplib.NewToolResultError("open store: " + err.Error()), nil
+	}
+	defer s.Close()
+	rows, err := s.DB().Query(q)
+	if err != nil {
+		return mcplib.NewToolResultError("query: " + err.Error()), nil
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		return mcplib.NewToolResultError("columns: " + err.Error()), nil
+	}
+	out := []map[string]any{}
+	for rows.Next() {
+		vals := make([]any, len(cols))
+		ptrs := make([]any, len(cols))
+		for i := range vals {
+			ptrs[i] = &vals[i]
+		}
+		if err := rows.Scan(ptrs...); err != nil {
+			return mcplib.NewToolResultError("scan: " + err.Error()), nil
+		}
+		row := map[string]any{}
+		for i, c := range cols {
+			if b, ok := vals[i].([]byte); ok {
+				row[c] = string(b)
+			} else {
+				row[c] = vals[i]
+			}
+		}
+		out = append(out, row)
+	}
+	data, _ := json.Marshal(map[string]any{"columns": cols, "count": len(out), "rows": out})
+	return mcplib.NewToolResultText(string(data)), nil
+}
+
+// handleSearch is the typed MCP tool handler for FTS5 search against the
+// synced dimensions, metrics, and pages tables.
+func handleSearch(_ context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+	args := req.GetArguments()
+	q, _ := args["query"].(string)
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return mcplib.NewToolResultError("query is required"), nil
+	}
+	property, _ := args["property"].(string)
+	limit := 20
+	if v, ok := args["limit"].(string); ok {
+		if n, err := strconvAtoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	path := dbPath()
+	if _, err := os.Stat(path); err != nil {
+		return mcplib.NewToolResultError("local store missing at " + path + " — run 'ga4-pp-cli sync schema' first"), nil
+	}
+	s, err := storeOpenReadOnly(path)
+	if err != nil {
+		return mcplib.NewToolResultError("open store: " + err.Error()), nil
+	}
+	defer s.Close()
+	hits, err := s.Search(property, q, limit)
+	if err != nil {
+		return mcplib.NewToolResultError("search: " + err.Error()), nil
+	}
+	data, _ := json.Marshal(map[string]any{"count": len(hits), "hits": hits})
+	return mcplib.NewToolResultText(string(data)), nil
+}
+
+func strconvAtoi(s string) (int, error) {
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, fmt.Errorf("not a number: %s", s)
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n, nil
+}
 
 func handleContext(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
 	ctx := map[string]any{
