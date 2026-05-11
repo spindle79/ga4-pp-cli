@@ -237,26 +237,32 @@ func newSyncPagesCmd(flags *rootFlags) *cobra.Command {
 			}
 			defer s.Close()
 
-			// Resume cursor: if a previous run finished partway, GetSyncState
-			// returns the row count we already wrote and we restart from
-			// that offset. last_date carries the most recent day captured —
-			// used elsewhere by 'doctor cache' and search freshness.
-			cursor, _ := s.GetSyncState(prop, "pages")
-			startOffset := 0
-			if cursor != nil {
-				startOffset = cursor.RowCount
-			}
-
+			// Each sync run re-fetches the full window from offset 0. The
+			// cursor's row_count is NOT a "resume from last sync" pointer —
+			// runReport's offset is relative to the current response, so
+			// starting at the previous count would skip rows that today's
+			// report places earlier (e.g. backfilled days or rank shuffles).
+			// The cursor is still updated below per page so an interrupt
+			// midway can be detected, but the next full invocation restarts
+			// the window cleanly.
 			startDate := fmt.Sprintf("%ddaysAgo", days)
 			totalRows := 0
-			pageToken := startOffset // GA4 uses offset+limit; treat offset as the page token
+			pageToken := 0
 			hasNext := true
 			for page := 0; hasNext && page < maxPages; page++ {
+				// pageTitle deliberately excluded from dimensions: the
+				// pages_daily PRIMARY KEY is (property_id, date, page_path),
+				// and including a title dimension causes GA4 to return one
+				// row per (date, path, title) tuple. Multiple titles for the
+				// same (date, path) collapse on UPSERT and lose all but one
+				// row's metrics — pages with title variants reported a tiny
+				// fraction of their real sessions. A separate
+				// 'sync page-titles' could populate page_title later without
+				// affecting metric correctness.
 				body := map[string]any{
 					"dimensions": []map[string]any{
 						{"name": "date"},
 						{"name": "pagePath"},
-						{"name": "pageTitle"},
 					},
 					"metrics": []map[string]any{
 						{"name": "sessions"},
@@ -300,7 +306,7 @@ func newSyncPagesCmd(flags *rootFlags) *cobra.Command {
 				if len(rows) > 0 {
 					lastDate = rows[len(rows)-1].Date
 				}
-				if serr := s.SaveSyncState(prop, "pages", lastDate, startOffset+totalRows); serr != nil {
+				if serr := s.SaveSyncState(prop, "pages", lastDate, totalRows); serr != nil {
 					return fmt.Errorf("save sync_state: %w", serr)
 				}
 				// Cursor advances by the actual returned row count, not the
@@ -413,9 +419,10 @@ func fetchReportPage(c clientForRunReport, property string, body map[string]any)
 }
 
 // pagesDailyFromReport converts a runReport response into PageDaily rows.
-// The report is expected to have dimensions [date, pagePath, pageTitle] and
-// metrics matching the request in newSyncPagesCmd. Missing metric values are
-// treated as 0; missing dimensions skip the row.
+// Required dimensions are [date, pagePath]; if a third dimension (pageTitle)
+// is present it's used to populate the descriptive column but rows are
+// still keyed on (date, pagePath) by the store. Missing metric values are
+// treated as 0; rows missing a required dimension are skipped.
 func pagesDailyFromReport(propertyID string, report map[string]any) ([]store.PageDaily, error) {
 	rowsAny, _ := report["rows"].([]any)
 	out := make([]store.PageDaily, 0, len(rowsAny))
@@ -431,7 +438,7 @@ func pagesDailyFromReport(propertyID string, report map[string]any) ([]store.Pag
 		}
 		dateRaw := dimensionAt(dims, 0)
 		pathRaw := dimensionAt(dims, 1)
-		titleRaw := dimensionAt(dims, 2)
+		titleRaw := dimensionAt(dims, 2) // optional; "" when absent
 		if pathRaw == "" || dateRaw == "" {
 			continue
 		}
