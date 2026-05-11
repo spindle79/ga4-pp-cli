@@ -75,9 +75,9 @@ property to appear in the response.`,
 func newAccountsListCmd(flags *rootFlags) *cobra.Command {
 	var pageSize int
 	cmd := &cobra.Command{
-		Use:     "list",
-		Short:   "List GA4 accounts the service account can access",
-		Example: "  ga4-pp-cli accounts list --agent",
+		Use:         "list",
+		Short:       "List GA4 accounts the service account can access",
+		Example:     "  ga4-pp-cli accounts list --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -131,14 +131,14 @@ propertyId to any Data API command via --property.`,
 			// — the tightest agent-friendly shape for property discovery.
 			var raw struct {
 				AccountSummaries []struct {
-					Account            string `json:"account"`
-					DisplayName        string `json:"displayName"`
-					Name               string `json:"name"`
-					PropertySummaries  []struct {
-						Property         string `json:"property"`
-						DisplayName      string `json:"displayName"`
-						PropertyType     string `json:"propertyType"`
-						Parent           string `json:"parent"`
+					Account           string `json:"account"`
+					DisplayName       string `json:"displayName"`
+					Name              string `json:"name"`
+					PropertySummaries []struct {
+						Property     string `json:"property"`
+						DisplayName  string `json:"displayName"`
+						PropertyType string `json:"propertyType"`
+						Parent       string `json:"parent"`
 					} `json:"propertySummaries"`
 				} `json:"accountSummaries"`
 			}
@@ -174,10 +174,10 @@ propertyId to any Data API command via --property.`,
 // the Data API host the generator targeted.
 func newPropertiesDescribeCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "describe [property]",
-		Aliases: []string{"info", "details"},
-		Short:   "GA4 Admin API: full property metadata (display name, time zone, currency, account)",
-		Example: "  ga4-pp-cli properties describe 123456789 --agent",
+		Use:         "describe [property]",
+		Aliases:     []string{"info", "details"},
+		Short:       "GA4 Admin API: full property metadata (display name, time zone, currency, account)",
+		Example:     "  ga4-pp-cli properties describe 123456789 --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {

@@ -25,7 +25,7 @@ func newReportsFunnelCmd(flags *rootFlags) *cobra.Command {
 		Short: "Step-by-step conversion funnel built on runReport (matches official Google MCP run_funnel_report)",
 		Long: `Composes a runReport call that filters on eventName IN (steps...) and
 returns per-event counts and conversion rates between adjacent steps.`,
-		Example: "  ga4-pp-cli reports funnel --steps page_view,sign_up,purchase --date-range 28daysAgo,today --agent",
+		Example:     "  ga4-pp-cli reports funnel --steps page_view,sign_up,purchase --date-range 28daysAgo,today --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if stepsCSV == "" {

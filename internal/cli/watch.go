@@ -38,10 +38,10 @@ func newWatchRealtimeCmd(flags *rootFlags) *cobra.Command {
 		Use:   "realtime",
 		Short: "Poll runRealtimeReport on an interval and stream diffs",
 		Long: `Each tick emits a JSON object with: tick number, timestamp, top N rows by
-metric, and a `+"`changes`"+` array of new entrants and rank shifts since the
+metric, and a ` + "`changes`" + ` array of new entrants and rank shifts since the
 previous tick. Press Ctrl-C (SIGINT) to stop, or pass --ticks N for a fixed
 number of polls.`,
-		Example: "  ga4-pp-cli watch realtime --interval 30s --top 10 --agent",
+		Example:     "  ga4-pp-cli watch realtime --interval 30s --top 10 --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -102,9 +102,9 @@ number of polls.`,
 						valStr, _ := mv[0].(map[string]any)["value"].(string)
 						val := atoi(valStr)
 						rows = append(rows, map[string]any{
-							"rank":         i + 1,
-							dimension:      key,
-							metric:         val,
+							"rank":    i + 1,
+							dimension: key,
+							metric:    val,
 						})
 						cur[key] = val
 						curRank[key] = i + 1

@@ -53,9 +53,9 @@ func openStore() (*store.Store, error) {
 func newSyncSchemaCmd(flags *rootFlags) *cobra.Command {
 	var property string
 	cmd := &cobra.Command{
-		Use:     "schema [property]",
-		Short:   "Sync dimensions and metrics from getMetadata into the local SQLite store",
-		Example: "  ga4-pp-cli sync schema 12345 --agent",
+		Use:         "schema [property]",
+		Short:       "Sync dimensions and metrics from getMetadata into the local SQLite store",
+		Example:     "  ga4-pp-cli sync schema 12345 --agent",
 		Annotations: map[string]string{"mcp:read-only": "false"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -143,9 +143,9 @@ func newSyncPagesCmd(flags *rootFlags) *cobra.Command {
 	var days int
 	var pageSize int
 	cmd := &cobra.Command{
-		Use:     "pages [property]",
-		Short:   "Sync per-day, per-page session metrics into pages_daily via runReport",
-		Example: "  ga4-pp-cli sync pages 12345 --days 30 --agent",
+		Use:         "pages [property]",
+		Short:       "Sync per-day, per-page session metrics into pages_daily via runReport",
+		Example:     "  ga4-pp-cli sync pages 12345 --days 30 --agent",
 		Annotations: map[string]string{"mcp:read-only": "false"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -230,9 +230,9 @@ func newSyncPagesCmd(flags *rootFlags) *cobra.Command {
 
 func newSyncPropertiesCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "properties",
-		Short:   "Sync accessible GA4 properties from the Admin API into the local store",
-		Example: "  ga4-pp-cli sync properties --agent",
+		Use:         "properties",
+		Short:       "Sync accessible GA4 properties from the Admin API into the local store",
+		Example:     "  ga4-pp-cli sync properties --agent",
 		Annotations: map[string]string{"mcp:read-only": "false"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {

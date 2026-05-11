@@ -25,9 +25,9 @@ func newPropertiesRunRealtimeReportCmd(flags *rootFlags) *cobra.Command {
 	var stdinBody bool
 
 	cmd := &cobra.Command{
-		Use:   "run-realtime-report [property]",
-		Short: "Returns a customized report of realtime event data for your property. Events appear in realtime reports seconds...",
-		Example: "  ga4-pp-cli properties run-realtime-report example-value",
+		Use:         "run-realtime-report [property]",
+		Short:       "Returns a customized report of realtime event data for your property. Events appear in realtime reports seconds...",
+		Example:     "  ga4-pp-cli properties run-realtime-report example-value",
 		Annotations: map[string]string{"pp:endpoint": "properties.run-realtime-report", "pp:method": "POST", "pp:path": "/v1beta/{property}:runRealtimeReport"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
@@ -126,7 +126,9 @@ func newPropertiesRunRealtimeReportCmd(flags *rootFlags) *cobra.Command {
 						return nil
 					}
 				} else {
-					var wrapped struct{ Data []map[string]any `json:"data"` }
+					var wrapped struct {
+						Data []map[string]any `json:"data"`
+					}
 					if json.Unmarshal(data, &wrapped) == nil && len(wrapped.Data) > 0 {
 						if err := printAutoTable(cmd.OutOrStdout(), wrapped.Data); err != nil {
 							fmt.Fprintf(os.Stderr, "warning: table rendering failed, falling back to JSON: %v\n", err)

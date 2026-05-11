@@ -95,10 +95,10 @@ so existing automations keep working.`,
 func newSchemaFetchCmd(flags *rootFlags) *cobra.Command {
 	var property string
 	cmd := &cobra.Command{
-		Use:     "fetch [property]",
-		Aliases: []string{"sync"},
-		Short:   "Fetch dimensions/metrics metadata from GA4 and cache to disk",
-		Example: "  ga4-pp-cli schema fetch    # uses GA_PROPERTY_ID",
+		Use:         "fetch [property]",
+		Aliases:     []string{"sync"},
+		Short:       "Fetch dimensions/metrics metadata from GA4 and cache to disk",
+		Example:     "  ga4-pp-cli schema fetch    # uses GA_PROPERTY_ID",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -180,7 +180,7 @@ func newSchemaListCmd(flags *rootFlags) *cobra.Command {
 		Long: `Reads from the cache written by 'schema fetch'. Use --kind to filter to
 dimensions or metrics; --custom shows only custom definitions registered on
 the property.`,
-		Example: "  ga4-pp-cli schema list --kind metric --custom --agent",
+		Example:     "  ga4-pp-cli schema list --kind metric --custom --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -233,9 +233,9 @@ func newSchemaSearchCmd(flags *rootFlags) *cobra.Command {
 	var property string
 	var kind string
 	cmd := &cobra.Command{
-		Use:   "search <query>",
-		Short: "Token-rank search across cached dimension/metric apiNames, uiNames, and descriptions",
-		Example: "  ga4-pp-cli schema search engagement --agent",
+		Use:         "search <query>",
+		Short:       "Token-rank search across cached dimension/metric apiNames, uiNames, and descriptions",
+		Example:     "  ga4-pp-cli schema search engagement --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {

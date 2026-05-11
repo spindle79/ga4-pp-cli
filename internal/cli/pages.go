@@ -83,10 +83,10 @@ func (p *pagesShared) resolveProp(flags *rootFlags) (string, error) {
 func newPagesViewsCmd(flags *rootFlags) *cobra.Command {
 	p := &pagesShared{}
 	cmd := &cobra.Command{
-		Use:     "views <pagePath>",
-		Aliases: []string{"pageviews"},
-		Short:   "Page views for a path (matches spindle79 getUrlPageViews + arbitrary match types)",
-		Example: "  ga4-pp-cli pages views /blog/launch --timeframe 7d --agent",
+		Use:         "views <pagePath>",
+		Aliases:     []string{"pageviews"},
+		Short:       "Page views for a path (matches spindle79 getUrlPageViews + arbitrary match types)",
+		Example:     "  ga4-pp-cli pages views /blog/launch --timeframe 7d --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -104,10 +104,10 @@ func newPagesViewsCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 			body := map[string]any{
-				"dimensions":      dimList("pagePath,date"),
-				"metrics":         metricList("screenPageViews"),
-				"dateRanges":      p.dateRanges(),
-				"dimensionFilter": pagePathFilter(args[0], p.matchType),
+				"dimensions":          dimList("pagePath,date"),
+				"metrics":             metricList("screenPageViews"),
+				"dateRanges":          p.dateRanges(),
+				"dimensionFilter":     pagePathFilter(args[0], p.matchType),
 				"returnPropertyQuota": true,
 			}
 			if p.limit > 0 {
@@ -127,9 +127,9 @@ func newPagesViewsCmd(flags *rootFlags) *cobra.Command {
 func newPagesEngagementCmd(flags *rootFlags) *cobra.Command {
 	p := &pagesShared{}
 	cmd := &cobra.Command{
-		Use:     "engagement <pagePath>",
-		Short:   "Engagement metrics for a path (bounceRate, engagedSessions, avg session duration, screenPageViewsPerSession)",
-		Example: "  ga4-pp-cli pages engagement /pricing --timeframe last-week --agent",
+		Use:         "engagement <pagePath>",
+		Short:       "Engagement metrics for a path (bounceRate, engagedSessions, avg session duration, screenPageViewsPerSession)",
+		Example:     "  ga4-pp-cli pages engagement /pricing --timeframe last-week --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -147,10 +147,10 @@ func newPagesEngagementCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 			body := map[string]any{
-				"dimensions":      dimList("pagePath"),
-				"metrics":         metricList("averageSessionDuration,bounceRate,engagedSessions,screenPageViewsPerSession"),
-				"dateRanges":      p.dateRanges(),
-				"dimensionFilter": pagePathFilter(args[0], p.matchType),
+				"dimensions":          dimList("pagePath"),
+				"metrics":             metricList("averageSessionDuration,bounceRate,engagedSessions,screenPageViewsPerSession"),
+				"dateRanges":          p.dateRanges(),
+				"dimensionFilter":     pagePathFilter(args[0], p.matchType),
 				"returnPropertyQuota": true,
 			}
 			report, err := runReport(newClientAdapter(c), prop, body)
@@ -167,10 +167,10 @@ func newPagesEngagementCmd(flags *rootFlags) *cobra.Command {
 func newPagesSourcesCmd(flags *rootFlags) *cobra.Command {
 	p := &pagesShared{}
 	cmd := &cobra.Command{
-		Use:     "sources <pagePath>",
-		Aliases: []string{"traffic-sources"},
-		Short:   "Traffic sources (source/medium) for a path",
-		Example: "  ga4-pp-cli pages sources /home --timeframe 30d --limit 20 --agent",
+		Use:         "sources <pagePath>",
+		Aliases:     []string{"traffic-sources"},
+		Short:       "Traffic sources (source/medium) for a path",
+		Example:     "  ga4-pp-cli pages sources /home --timeframe 30d --limit 20 --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -216,9 +216,9 @@ func newPagesSourcesCmd(flags *rootFlags) *cobra.Command {
 func newPagesConversionsCmd(flags *rootFlags) *cobra.Command {
 	p := &pagesShared{}
 	cmd := &cobra.Command{
-		Use:     "conversions <pagePath>",
-		Short:   "Conversion events triggered on a path",
-		Example: "  ga4-pp-cli pages conversions /signup --timeframe 28d --agent",
+		Use:         "conversions <pagePath>",
+		Short:       "Conversion events triggered on a path",
+		Example:     "  ga4-pp-cli pages conversions /signup --timeframe 28d --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -262,10 +262,10 @@ func newPagesConversionsCmd(flags *rootFlags) *cobra.Command {
 func newPagesAnalyticsCmd(flags *rootFlags) *cobra.Command {
 	p := &pagesShared{}
 	cmd := &cobra.Command{
-		Use:     "analytics <pagePath>",
-		Aliases: []string{"all"},
-		Short:   "Combined views + engagement + sources + conversions in one batchRunReports call",
-		Example: "  ga4-pp-cli pages analytics /landing --timeframe last-week --agent",
+		Use:         "analytics <pagePath>",
+		Aliases:     []string{"all"},
+		Short:       "Combined views + engagement + sources + conversions in one batchRunReports call",
+		Example:     "  ga4-pp-cli pages analytics /landing --timeframe last-week --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -319,7 +319,7 @@ func newPagesAnalyticsCmd(flags *rootFlags) *cobra.Command {
 			}
 			// batchRunReports returns {reports:[...]} — collect warnings across each report
 			out := map[string]any{
-				"path":  args[0],
+				"path":    args[0],
 				"reports": map[string]any{},
 			}
 			if reports, ok := report["reports"].([]any); ok && len(reports) >= 4 {

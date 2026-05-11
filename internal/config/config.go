@@ -14,17 +14,17 @@ import (
 )
 
 type Config struct {
-	BaseURL        string `toml:"base_url"`
-	AuthHeaderVal  string `toml:"auth_header"`
-	Headers        map[string]string `toml:"headers,omitempty"`
-	AuthSource     string `toml:"-"`
-	AccessToken    string `toml:"access_token"`
-	RefreshToken   string `toml:"refresh_token"`
-	TokenExpiry    time.Time `toml:"token_expiry"`
-	ClientID       string `toml:"client_id"`
-	ClientSecret   string `toml:"client_secret"`
-	Path           string `toml:"-"`
-	GoogleAnalyticsDataOauth2c string `toml:"analytics_data_oauth2c"`
+	BaseURL                    string            `toml:"base_url"`
+	AuthHeaderVal              string            `toml:"auth_header"`
+	Headers                    map[string]string `toml:"headers,omitempty"`
+	AuthSource                 string            `toml:"-"`
+	AccessToken                string            `toml:"access_token"`
+	RefreshToken               string            `toml:"refresh_token"`
+	TokenExpiry                time.Time         `toml:"token_expiry"`
+	ClientID                   string            `toml:"client_id"`
+	ClientSecret               string            `toml:"client_secret"`
+	Path                       string            `toml:"-"`
+	GoogleAnalyticsDataOauth2c string            `toml:"analytics_data_oauth2c"`
 	// PropertyID is the default GA4 property numeric ID. Resolved from
 	// GA_PROPERTY_ID at load time; commands that take a `<property>` arg
 	// fall back to this when the user omits it.

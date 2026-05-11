@@ -20,15 +20,15 @@ func newSearchCmd(flags *rootFlags) *cobra.Command {
 	var property string
 	var limit int
 	cmd := &cobra.Command{
-		Use:     "search <query>",
-		Short:   "Search dimensions, metrics, and synced page paths via the local FTS5 index",
+		Use:   "search <query>",
+		Short: "Search dimensions, metrics, and synced page paths via the local FTS5 index",
 		Long: `Runs an FTS5 query against the local SQLite store written by 'sync schema' /
 'sync pages'. Searches across dimension/metric apiName/uiName/description and
 LIKE-matches page_path/page_title in pages_daily.
 
 Requires the store to be populated — run 'ga4-pp-cli sync schema' and (optionally)
 'ga4-pp-cli sync pages' first.`,
-		Example: "  ga4-pp-cli search engagement --agent",
+		Example:     "  ga4-pp-cli search engagement --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {

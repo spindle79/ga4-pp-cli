@@ -21,9 +21,9 @@ func newPropertiesCheckCompatibilityCmd(flags *rootFlags) *cobra.Command {
 	var stdinBody bool
 
 	cmd := &cobra.Command{
-		Use:   "check-compatibility [property]",
-		Short: "This compatibility method lists dimensions and metrics that can be added to a report request and maintain...",
-		Example: "  ga4-pp-cli properties check-compatibility example-value",
+		Use:         "check-compatibility [property]",
+		Short:       "This compatibility method lists dimensions and metrics that can be added to a report request and maintain...",
+		Example:     "  ga4-pp-cli properties check-compatibility example-value",
 		Annotations: map[string]string{"pp:endpoint": "properties.check-compatibility", "pp:method": "POST", "pp:path": "/v1beta/{property}:checkCompatibility"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)
@@ -98,7 +98,9 @@ func newPropertiesCheckCompatibilityCmd(flags *rootFlags) *cobra.Command {
 						return nil
 					}
 				} else {
-					var wrapped struct{ Data []map[string]any `json:"data"` }
+					var wrapped struct {
+						Data []map[string]any `json:"data"`
+					}
 					if json.Unmarshal(data, &wrapped) == nil && len(wrapped.Data) > 0 {
 						if err := printAutoTable(cmd.OutOrStdout(), wrapped.Data); err != nil {
 							fmt.Fprintf(os.Stderr, "warning: table rendering failed, falling back to JSON: %v\n", err)

@@ -179,7 +179,7 @@ type SchemaEntry struct {
 	APIName     string `json:"api_name"`
 	UIName      string `json:"ui_name,omitempty"`
 	Description string `json:"description,omitempty"`
-	Type        string `json:"type,omitempty"`     // metrics only
+	Type        string `json:"type,omitempty"` // metrics only
 	Category    string `json:"category,omitempty"`
 	Custom      bool   `json:"custom,omitempty"`
 	UpdatedAt   string `json:"updated_at"`
@@ -261,17 +261,17 @@ func (s *Store) upsertSchema(propertyID string, entries []SchemaEntry, table str
 
 // PageDaily is one (date, page_path) row.
 type PageDaily struct {
-	PropertyID              string  `json:"property_id"`
-	Date                    string  `json:"date"`
-	PagePath                string  `json:"page_path"`
-	PageTitle               string  `json:"page_title,omitempty"`
-	Sessions                float64 `json:"sessions"`
-	ScreenPageViews         float64 `json:"screen_page_views"`
-	EngagedSessions         float64 `json:"engaged_sessions"`
-	TotalUsers              float64 `json:"total_users"`
-	EngagementRate          float64 `json:"engagement_rate"`
-	AverageSessionDuration  float64 `json:"average_session_duration"`
-	Conversions             float64 `json:"conversions"`
+	PropertyID             string  `json:"property_id"`
+	Date                   string  `json:"date"`
+	PagePath               string  `json:"page_path"`
+	PageTitle              string  `json:"page_title,omitempty"`
+	Sessions               float64 `json:"sessions"`
+	ScreenPageViews        float64 `json:"screen_page_views"`
+	EngagedSessions        float64 `json:"engaged_sessions"`
+	TotalUsers             float64 `json:"total_users"`
+	EngagementRate         float64 `json:"engagement_rate"`
+	AverageSessionDuration float64 `json:"average_session_duration"`
+	Conversions            float64 `json:"conversions"`
 }
 
 // UpsertPagesDaily writes a batch of pages_daily rows in a single tx, replacing
@@ -417,7 +417,7 @@ func (s *Store) GetSyncState(propertyID, scope string) (*SyncState, error) {
 // SearchHit is a single FTS result row, kind-tagged so callers can render a
 // mixed result list cleanly.
 type SearchHit struct {
-	Kind        string `json:"kind"`           // "dimension" | "metric" | "page"
+	Kind        string `json:"kind"` // "dimension" | "metric" | "page"
 	PropertyID  string `json:"property_id"`
 	APIName     string `json:"api_name,omitempty"`
 	UIName      string `json:"ui_name,omitempty"`
@@ -502,4 +502,3 @@ func (s *Store) Search(propertyID, query string, limit int) ([]SearchHit, error)
 
 	return hits, nil
 }
-

@@ -7,15 +7,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ga4-pp-cli/internal/cliutil"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"io"
 	"os"
 	"sort"
 	"strings"
 	"text/tabwriter"
 	"unicode"
-	"ga4-pp-cli/internal/cliutil"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 var As = errors.As
@@ -90,12 +90,13 @@ func (e *cliError) Error() string { return e.err.Error() }
 func (e *cliError) Unwrap() error { return e.err }
 
 // Exit codes follow the Printing Press convention:
-//   0 = success
-//   2 = usage (bad flags, missing args, config problems)
-//   3 = auth (missing/invalid credentials, 401/403)
-//   4 = not-found (404, unknown resource)
-//   5 = rate-limit (429)
-//   7 = server (5xx, generic API failure)
+//
+//	0 = success
+//	2 = usage (bad flags, missing args, config problems)
+//	3 = auth (missing/invalid credentials, 401/403)
+//	4 = not-found (404, unknown resource)
+//	5 = rate-limit (429)
+//	7 = server (5xx, generic API failure)
 func usageErr(err error) error     { return &cliError{code: 2, err: err} }
 func authErr(err error) error      { return &cliError{code: 3, err: err} }
 func notFoundErr(err error) error  { return &cliError{code: 4, err: err} }

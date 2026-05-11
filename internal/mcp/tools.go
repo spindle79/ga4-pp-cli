@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	mcplib "github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 	"ga4-pp-cli/internal/cli"
-	"ga4-pp-cli/internal/cliutil"
 	"ga4-pp-cli/internal/client"
+	"ga4-pp-cli/internal/cliutil"
 	"ga4-pp-cli/internal/config"
 	"ga4-pp-cli/internal/mcp/cobratree"
+	mcplib "github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 // RegisterTools registers all API operations as MCP tools.
@@ -31,7 +31,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
-		makeAPIHandler("POST", "/v1beta/{property}:batchRunPivotReports", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"},{PublicName: "requests", WireName: "requests", Location: "body"}, }, []string{"property", }),
+		makeAPIHandler("POST", "/v1beta/{property}:batchRunPivotReports", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"}, {PublicName: "requests", WireName: "requests", Location: "body"}}, []string{"property"}),
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_batch-run-reports",
@@ -41,7 +41,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
-		makeAPIHandler("POST", "/v1beta/{property}:batchRunReports", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"},{PublicName: "requests", WireName: "requests", Location: "body"}, }, []string{"property", }),
+		makeAPIHandler("POST", "/v1beta/{property}:batchRunReports", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"}, {PublicName: "requests", WireName: "requests", Location: "body"}}, []string{"property"}),
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_check-compatibility",
@@ -55,7 +55,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
-		makeAPIHandler("POST", "/v1beta/{property}:checkCompatibility", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"},{PublicName: "compatibilityFilter", WireName: "compatibilityFilter", Location: "body"},{PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"},{PublicName: "dimensions", WireName: "dimensions", Location: "body"},{PublicName: "metricFilter", WireName: "metricFilter", Location: "body"},{PublicName: "metrics", WireName: "metrics", Location: "body"}, }, []string{"property", }),
+		makeAPIHandler("POST", "/v1beta/{property}:checkCompatibility", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"}, {PublicName: "compatibilityFilter", WireName: "compatibilityFilter", Location: "body"}, {PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"}, {PublicName: "dimensions", WireName: "dimensions", Location: "body"}, {PublicName: "metricFilter", WireName: "metricFilter", Location: "body"}, {PublicName: "metrics", WireName: "metrics", Location: "body"}}, []string{"property"}),
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_get-metadata",
@@ -65,7 +65,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
-		makeAPIHandler("GET", "/v1beta/{name}", []mcpParamBinding{{PublicName: "name", WireName: "name", Location: "path"}, }, []string{"name", }),
+		makeAPIHandler("GET", "/v1beta/{name}", []mcpParamBinding{{PublicName: "name", WireName: "name", Location: "path"}}, []string{"name"}),
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_run-pivot-report",
@@ -84,7 +84,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
-		makeAPIHandler("POST", "/v1beta/{property}:runPivotReport", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"},{PublicName: "cohortSpec", WireName: "cohortSpec", Location: "body"},{PublicName: "currencyCode", WireName: "currencyCode", Location: "body"},{PublicName: "dateRanges", WireName: "dateRanges", Location: "body"},{PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"},{PublicName: "dimensions", WireName: "dimensions", Location: "body"},{PublicName: "keepEmptyRows", WireName: "keepEmptyRows", Location: "body"},{PublicName: "metricFilter", WireName: "metricFilter", Location: "body"},{PublicName: "metrics", WireName: "metrics", Location: "body"},{PublicName: "pivots", WireName: "pivots", Location: "body"},{PublicName: "returnPropertyQuota", WireName: "returnPropertyQuota", Location: "body"}, }, []string{"property", }),
+		makeAPIHandler("POST", "/v1beta/{property}:runPivotReport", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"}, {PublicName: "cohortSpec", WireName: "cohortSpec", Location: "body"}, {PublicName: "currencyCode", WireName: "currencyCode", Location: "body"}, {PublicName: "dateRanges", WireName: "dateRanges", Location: "body"}, {PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"}, {PublicName: "dimensions", WireName: "dimensions", Location: "body"}, {PublicName: "keepEmptyRows", WireName: "keepEmptyRows", Location: "body"}, {PublicName: "metricFilter", WireName: "metricFilter", Location: "body"}, {PublicName: "metrics", WireName: "metrics", Location: "body"}, {PublicName: "pivots", WireName: "pivots", Location: "body"}, {PublicName: "returnPropertyQuota", WireName: "returnPropertyQuota", Location: "body"}}, []string{"property"}),
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_run-realtime-report",
@@ -102,7 +102,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
-		makeAPIHandler("POST", "/v1beta/{property}:runRealtimeReport", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"},{PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"},{PublicName: "dimensions", WireName: "dimensions", Location: "body"},{PublicName: "limit", WireName: "limit", Location: "body"},{PublicName: "metricAggregations", WireName: "metricAggregations", Location: "body"},{PublicName: "metricFilter", WireName: "metricFilter", Location: "body"},{PublicName: "metrics", WireName: "metrics", Location: "body"},{PublicName: "minuteRanges", WireName: "minuteRanges", Location: "body"},{PublicName: "orderBys", WireName: "orderBys", Location: "body"},{PublicName: "returnPropertyQuota", WireName: "returnPropertyQuota", Location: "body"}, }, []string{"property", }),
+		makeAPIHandler("POST", "/v1beta/{property}:runRealtimeReport", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"}, {PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"}, {PublicName: "dimensions", WireName: "dimensions", Location: "body"}, {PublicName: "limit", WireName: "limit", Location: "body"}, {PublicName: "metricAggregations", WireName: "metricAggregations", Location: "body"}, {PublicName: "metricFilter", WireName: "metricFilter", Location: "body"}, {PublicName: "metrics", WireName: "metrics", Location: "body"}, {PublicName: "minuteRanges", WireName: "minuteRanges", Location: "body"}, {PublicName: "orderBys", WireName: "orderBys", Location: "body"}, {PublicName: "returnPropertyQuota", WireName: "returnPropertyQuota", Location: "body"}}, []string{"property"}),
 	)
 	s.AddTool(
 		mcplib.NewTool("properties_run-report",
@@ -124,7 +124,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcplib.WithDestructiveHintAnnotation(false),
 			mcplib.WithOpenWorldHintAnnotation(true),
 		),
-		makeAPIHandler("POST", "/v1beta/{property}:runReport", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"},{PublicName: "cohortSpec", WireName: "cohortSpec", Location: "body"},{PublicName: "currencyCode", WireName: "currencyCode", Location: "body"},{PublicName: "dateRanges", WireName: "dateRanges", Location: "body"},{PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"},{PublicName: "dimensions", WireName: "dimensions", Location: "body"},{PublicName: "keepEmptyRows", WireName: "keepEmptyRows", Location: "body"},{PublicName: "limit", WireName: "limit", Location: "body"},{PublicName: "metricAggregations", WireName: "metricAggregations", Location: "body"},{PublicName: "metricFilter", WireName: "metricFilter", Location: "body"},{PublicName: "metrics", WireName: "metrics", Location: "body"},{PublicName: "offset", WireName: "offset", Location: "body"},{PublicName: "orderBys", WireName: "orderBys", Location: "body"},{PublicName: "returnPropertyQuota", WireName: "returnPropertyQuota", Location: "body"}, }, []string{"property", }),
+		makeAPIHandler("POST", "/v1beta/{property}:runReport", []mcpParamBinding{{PublicName: "property", WireName: "property", Location: "path"}, {PublicName: "cohortSpec", WireName: "cohortSpec", Location: "body"}, {PublicName: "currencyCode", WireName: "currencyCode", Location: "body"}, {PublicName: "dateRanges", WireName: "dateRanges", Location: "body"}, {PublicName: "dimensionFilter", WireName: "dimensionFilter", Location: "body"}, {PublicName: "dimensions", WireName: "dimensions", Location: "body"}, {PublicName: "keepEmptyRows", WireName: "keepEmptyRows", Location: "body"}, {PublicName: "limit", WireName: "limit", Location: "body"}, {PublicName: "metricAggregations", WireName: "metricAggregations", Location: "body"}, {PublicName: "metricFilter", WireName: "metricFilter", Location: "body"}, {PublicName: "metrics", WireName: "metrics", Location: "body"}, {PublicName: "offset", WireName: "offset", Location: "body"}, {PublicName: "orderBys", WireName: "orderBys", Location: "body"}, {PublicName: "returnPropertyQuota", WireName: "returnPropertyQuota", Location: "body"}}, []string{"property"}),
 	)
 
 	// Context tool — front-loaded domain knowledge for agents.
@@ -301,6 +301,7 @@ func dbPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".local", "share", "ga4-pp-cli", "data.db")
 }
+
 // Note: MCP tools use their own dbPath() because they are in a separate package (main, not cli).
 // The CLI's defaultDBPath() in the cli package uses the same canonical path.
 
@@ -316,20 +317,20 @@ func handleContext(_ context.Context, _ mcplib.CallToolRequest) (*mcplib.CallToo
 			"type": "bearer_token",
 			"env_vars": []map[string]any{
 				{
-					"name": "GOOGLE_ANALYTICS_DATA_OAUTH2C",
-					"kind": "per_call",
-					"required": true,
-					"sensitive": true,
+					"name":        "GOOGLE_ANALYTICS_DATA_OAUTH2C",
+					"kind":        "per_call",
+					"required":    true,
+					"sensitive":   true,
 					"description": "Set to your API credential.",
 				},
 			},
 		},
 		"resources": []map[string]any{
 			{
-				"name": "properties",
+				"name":        "properties",
 				"description": "Manage properties",
-				"endpoints": []string{"batch-run-pivot-reports", "batch-run-reports", "check-compatibility", "get-metadata", "run-pivot-report", "run-realtime-report", "run-report",  },
-				"searchable": true,
+				"endpoints":   []string{"batch-run-pivot-reports", "batch-run-reports", "check-compatibility", "get-metadata", "run-pivot-report", "run-realtime-report", "run-report"},
+				"searchable":  true,
 			},
 		},
 		"query_tips": []string{

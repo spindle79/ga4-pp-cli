@@ -17,9 +17,9 @@ import (
 
 func newDriftCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "drift",
-		Short:   "Compare two adjacent date ranges and surface biggest movers",
-		Long:    `One batchRunReports call hits both periods; the join happens locally.`,
+		Use:   "drift",
+		Short: "Compare two adjacent date ranges and surface biggest movers",
+		Long:  `One batchRunReports call hits both periods; the join happens locally.`,
 	}
 	cmd.AddCommand(newDriftPagesCmd(flags))
 	return cmd
@@ -126,14 +126,14 @@ func newDriftPagesCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			payload := map[string]any{
-				"property":   prop,
-				"metric":     metric,
-				"window":     window,
-				"current":    cur,
-				"prior":      prev,
-				"row_count":  len(rows),
-				"rows":       rows,
-				"_warnings":  append(extractGA4Warnings(asMap(reports[0])), extractGA4Warnings(asMap(reports[1]))...),
+				"property":  prop,
+				"metric":    metric,
+				"window":    window,
+				"current":   cur,
+				"prior":     prev,
+				"row_count": len(rows),
+				"rows":      rows,
+				"_warnings": append(extractGA4Warnings(asMap(reports[0])), extractGA4Warnings(asMap(reports[1]))...),
 			}
 			b, _ := json.MarshalIndent(payload, "", "  ")
 			return printOutputWithFlags(cmd.OutOrStdout(), b, flags)

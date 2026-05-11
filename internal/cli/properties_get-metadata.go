@@ -14,10 +14,10 @@ import (
 func newPropertiesGetMetadataCmd(flags *rootFlags) *cobra.Command {
 
 	cmd := &cobra.Command{
-		Use:   "get-metadata [property]",
-		Aliases: []string{"get", "metadata"},
-		Short: "Returns metadata for dimensions and metrics available in reporting methods.",
-		Example: "  ga4-pp-cli properties get-metadata 123456789\n  ga4-pp-cli properties metadata --json    # uses GA_PROPERTY_ID",
+		Use:         "get-metadata [property]",
+		Aliases:     []string{"get", "metadata"},
+		Short:       "Returns metadata for dimensions and metrics available in reporting methods.",
+		Example:     "  ga4-pp-cli properties get-metadata 123456789\n  ga4-pp-cli properties metadata --json    # uses GA_PROPERTY_ID",
 		Annotations: map[string]string{"pp:endpoint": "properties.get-metadata", "pp:method": "GET", "pp:path": "/v1beta/{name}", "mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			property, err := resolveProperty(args, flags)

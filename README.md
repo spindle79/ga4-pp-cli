@@ -104,19 +104,21 @@ These capabilities aren't available in any other tool for this API.
   ga4-pp-cli drift pages --window 7d --top 20 --agent
   ```
 
-### Local data layer (SQLite)
-- **`sync schema` / `sync pages` / `sync properties`** — Populate a local SQLite store at `$PRESS_DATA_DIR/ga4/data.db` (falls back to `~/.local/share/ga4-pp-cli/data.db`). Tables: `properties`, `dimensions`, `metrics`, `pages_daily`, `sync_state`, with FTS5 mirrors `dimensions_fts` / `metrics_fts`.
+### Offline local store (SQLite)
+- **`sync schema` / `sync pages` / `sync properties`** — Populate a local SQLite store at `$PRESS_DATA_DIR/ga4/data.db` (falls back to `~/.local/share/ga4-pp-cli/data.db`). Tables: `properties`, `dimensions`, `metrics`, `pages_daily`, `sync_state`, with FTS5 mirrors for dimensions and metrics.
+
+  _When an agent asks the same question hourly, the repeat queries hit local SQLite instead of burning GA4 quota._
 
   ```bash
   ga4-pp-cli sync schema --agent
   ga4-pp-cli sync pages --days 30 --agent
   ```
-- **`search <query>`** — FTS5 across dimensions + metrics + synced page paths in one call. Honors `--data-source local|auto`.
+- **`search <query>`** — FTS5 over dimensions, metrics, and synced page paths in one call. Honors `--data-source local|auto|live`.
 
   ```bash
   ga4-pp-cli search engagement --agent
   ```
-- **`sql "<SELECT …>"`** — Read-only raw SQL escape hatch over the store. Refuses anything that isn't `SELECT/WITH/EXPLAIN/PRAGMA`.
+- **`sql "<SELECT …>"`** — Read-only raw SQL over the local store. Refuses anything that isn't `SELECT/WITH/EXPLAIN/PRAGMA`.
 
   ```bash
   ga4-pp-cli sql "SELECT page_path, SUM(sessions) FROM pages_daily GROUP BY page_path ORDER BY 2 DESC LIMIT 10"
@@ -155,13 +157,6 @@ These capabilities aren't available in any other tool for this API.
   ```bash
   ga4-pp-cli templates compat weekly-content --agent
   ```
-
-<!-- Future work (intentionally deferred):
-     - retention   — cohort retention curves built off pages_daily + a users-by-first-visit dim.
-     - acquisition-mix — multi-source breakdown joining sessionSource, sessionMedium, sessionCampaign.
-     - dropoff     — funnel-style step dropoff joining a saved funnel template against pages_daily.
-     These are good next compound commands once the user has a real GA4 property
-     to sync from and can sanity-check the math against the GA4 web UI. -->
 
 ## Usage
 

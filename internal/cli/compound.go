@@ -28,15 +28,15 @@ func newTrafficAnomaliesCmd(flags *rootFlags) *cobra.Command {
 	var minSeries int
 	var limit int
 	cmd := &cobra.Command{
-		Use:     "traffic-anomalies",
-		Short:   "Flag pages whose latest day's sessions deviate from the rolling mean by N stdev (z-score)",
+		Use:   "traffic-anomalies",
+		Short: "Flag pages whose latest day's sessions deviate from the rolling mean by N stdev (z-score)",
 		Long: `Computes per-page z-scores over a rolling window of pages_daily.sessions and
 returns pages whose most-recent observation exceeds --threshold standard
 deviations from the window's mean.
 
 Reads the local store by default; --data-source live runs one runReport call
 and computes the z-scores in-process (slower, but works without a prior sync).`,
-		Example: "  ga4-pp-cli traffic-anomalies --days 30 --threshold 2.0 --agent",
+		Example:     "  ga4-pp-cli traffic-anomalies --days 30 --threshold 2.0 --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -90,14 +90,14 @@ and computes the z-scores in-process (slower, but works without a prior sync).`,
 
 // Anomaly is one z-scored page result for the traffic-anomalies command.
 type Anomaly struct {
-	PagePath  string  `json:"page_path"`
-	PageTitle string  `json:"page_title,omitempty"`
-	Latest    float64 `json:"latest_sessions"`
-	Mean      float64 `json:"mean_sessions"`
-	Stdev     float64 `json:"stdev"`
-	ZScore    float64 `json:"z_score"`
-	LatestDate string `json:"latest_date"`
-	Days       int    `json:"days_in_window"`
+	PagePath   string  `json:"page_path"`
+	PageTitle  string  `json:"page_title,omitempty"`
+	Latest     float64 `json:"latest_sessions"`
+	Mean       float64 `json:"mean_sessions"`
+	Stdev      float64 `json:"stdev"`
+	ZScore     float64 `json:"z_score"`
+	LatestDate string  `json:"latest_date"`
+	Days       int     `json:"days_in_window"`
 }
 
 // computeAnomalies groups rows by page_path and computes a z-score on the
@@ -166,8 +166,8 @@ func newBotTrafficCmd(flags *rootFlags) *cobra.Command {
 	var minSessions float64
 	var limit int
 	cmd := &cobra.Command{
-		Use:     "bot-traffic",
-		Short:   "Flag pages whose heuristics suggest bot or scraper traffic from pages_daily",
+		Use:   "bot-traffic",
+		Short: "Flag pages whose heuristics suggest bot or scraper traffic from pages_daily",
 		Long: `Heuristic scan over pages_daily for suspicious traffic patterns:
 
   • engagement_rate < 0.1 (near-zero engagement)
@@ -177,7 +177,7 @@ func newBotTrafficCmd(flags *rootFlags) *cobra.Command {
 Each match adds a flag. Pages with two or more flags are returned, ranked by
 total sessions in the window. Reads from the local store (run 'sync pages'
 first); --data-source live falls back to a single runReport.`,
-		Example: "  ga4-pp-cli bot-traffic --days 7 --agent",
+		Example:     "  ga4-pp-cli bot-traffic --days 7 --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -415,4 +415,3 @@ func roundN(v float64, n int) float64 {
 	p := math.Pow(10, float64(n))
 	return math.Round(v*p) / p
 }
-

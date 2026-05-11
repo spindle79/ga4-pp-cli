@@ -85,9 +85,9 @@ If verification fails, the command prints exactly which ADC step failed.`,
 
 			if flags.asJSON {
 				return printJSONFiltered(out, map[string]any{
-					"ok":         true,
-					"source":     src,
-					"expires_at": tok.Expiry.Format(time.RFC3339),
+					"ok":          true,
+					"source":      src,
+					"expires_at":  tok.Expiry.Format(time.RFC3339),
 					"property_id": cfg.PropertyID,
 				}, flags)
 			}
@@ -125,12 +125,12 @@ func newAuthStatusCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			report := map[string]any{
-				"authenticated":      adc || cfg.AccessToken != "" || cfg.AuthHeaderVal != "" || cfg.GoogleAnalyticsDataOauth2c != "",
-				"source":             source,
-				"google_adc_ready":   adc,
-				"credentials_path":   cfg.CredentialsPath,
-				"property_id":        cfg.PropertyID,
-				"config_path":        cfg.Path,
+				"authenticated":    adc || cfg.AccessToken != "" || cfg.AuthHeaderVal != "" || cfg.GoogleAnalyticsDataOauth2c != "",
+				"source":           source,
+				"google_adc_ready": adc,
+				"credentials_path": cfg.CredentialsPath,
+				"property_id":      cfg.PropertyID,
+				"config_path":      cfg.Path,
 			}
 
 			if flags.asJSON {

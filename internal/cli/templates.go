@@ -182,8 +182,9 @@ func newTemplatesSaveCmd(flags *rootFlags) *cobra.Command {
 
 func newTemplatesListCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List saved templates",
+		Use:         "list",
+		Short:       "List saved GA4 report templates with name, property, and description",
+		Example:     "  ga4-pp-cli templates list --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
@@ -230,10 +231,10 @@ func newTemplatesListCmd(flags *rootFlags) *cobra.Command {
 func newTemplatesRunCmd(flags *rootFlags) *cobra.Command {
 	var property string
 	cmd := &cobra.Command{
-		Use:     "run <name>",
-		Aliases: []string{"exec"},
-		Short:   "Run a saved template",
-		Example: "  ga4-pp-cli templates run weekly-content --agent",
+		Use:         "run <name>",
+		Aliases:     []string{"exec"},
+		Short:       "Run a saved template",
+		Example:     "  ga4-pp-cli templates run weekly-content --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -281,7 +282,7 @@ func newTemplatesCompatCmd(flags *rootFlags) *cobra.Command {
 template, paired with the template's full dimension list. Returns a matrix
 showing which metrics are compatible with the chosen dimensions and which
 would 400 the underlying runReport.`,
-		Example: "  ga4-pp-cli templates compat weekly-content --agent",
+		Example:     "  ga4-pp-cli templates compat weekly-content --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
@@ -336,7 +337,7 @@ would 400 the underlying runReport.`,
 				path := "/v1beta/properties/" + prop + ":checkCompatibility"
 				raw, _, err := adapter.post(path, body)
 				row := map[string]any{
-					"metric":     mm["name"],
+					"metric": mm["name"],
 				}
 				if err != nil {
 					row["compatible"] = false

@@ -20,8 +20,8 @@ import (
 func newSQLCmd(flags *rootFlags) *cobra.Command {
 	var limit int
 	cmd := &cobra.Command{
-		Use:     "sql <query>",
-		Short:   "Run a read-only SQL query against the local SQLite store",
+		Use:   "sql <query>",
+		Short: "Run a read-only SQL query against the local SQLite store",
 		Long: `Executes a single SELECT/WITH/EXPLAIN/PRAGMA against the on-disk store at
 $PRESS_DATA_DIR/ga4/data.db (created by 'sync'). The store is opened in
 read-only mode and write statements are rejected.
@@ -30,7 +30,7 @@ read-only mode and write statements are rejected.
 
 Tables: properties, dimensions, metrics, pages_daily, sync_state.
 FTS5 mirrors: dimensions_fts, metrics_fts.`,
-		Example: `  ga4-pp-cli sql "SELECT api_name, ui_name FROM metrics LIMIT 5"`,
+		Example:     `  ga4-pp-cli sql "SELECT api_name, ui_name FROM metrics LIMIT 5"`,
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {

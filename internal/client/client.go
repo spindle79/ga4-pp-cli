@@ -10,6 +10,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"ga4-pp-cli/internal/cliutil"
+	"ga4-pp-cli/internal/config"
+	"ga4-pp-cli/internal/googleauth"
 	"io"
 	"math"
 	"net/http"
@@ -19,9 +22,6 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"ga4-pp-cli/internal/cliutil"
-	"ga4-pp-cli/internal/config"
-	"ga4-pp-cli/internal/googleauth"
 )
 
 type Client struct {
@@ -33,8 +33,6 @@ type Client struct {
 	cacheDir   string
 	limiter    *cliutil.AdaptiveLimiter
 }
-
-
 
 // APIError carries HTTP status information for structured exit codes.
 type APIError struct {
@@ -452,7 +450,6 @@ func sanitizeJSONResponse(body []byte) []byte {
 	}
 	return body
 }
-
 
 // maskToken redacts all but the last 4 characters of a token for safe display.
 func maskToken(token string) string {
