@@ -156,6 +156,16 @@ func collectAgentCommands(c *cobra.Command) []agentContextCommand {
 		if sub.Hidden || sub.Name() == "agent-context" {
 			continue
 		}
+		// `mcp:hidden` opts a command out of the agent-facing surface (MCP
+		// tools, live-dogfood walker, agent-context tree). The command is
+		// still discoverable via `--help` and callable from the CLI; it
+		// just doesn't get exercised by the agent-side automation. Used
+		// for commands that take hardcoded fake IDs in their Examples
+		// (e.g. admin `describe --*-id 7777`) which would otherwise 404
+		// against any real account.
+		if v, ok := sub.Annotations["mcp:hidden"]; ok && (v == "true" || v == "1") {
+			continue
+		}
 		entry := agentContextCommand{
 			Name:  sub.Name(),
 			Use:   sub.Use,

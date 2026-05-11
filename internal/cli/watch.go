@@ -41,7 +41,7 @@ func newWatchRealtimeCmd(flags *rootFlags) *cobra.Command {
 metric, and a ` + "`changes`" + ` array of new entrants and rank shifts since the
 previous tick. Press Ctrl-C (SIGINT) to stop, or pass --ticks N for a fixed
 number of polls.`,
-		Example:     "  ga4-pp-cli watch realtime --interval 30s --top 10 --agent",
+		Example:     "  ga4-pp-cli watch realtime --interval 30s --top 10 --ticks 1 --agent",
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {

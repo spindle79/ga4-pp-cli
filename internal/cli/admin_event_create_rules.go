@@ -19,8 +19,10 @@ func newEventCreateRulesCmd(flags *rootFlags) *cobra.Command {
 		Aliases:     []string{"event-rules"},
 		Short:       "List event-create rules configured on a GA4 data stream via the Admin API",
 		Long:        `Returns every eventCreateRule on the data stream. These rules synthesize new events from parameter matchers; if a report shows event names you don't recognize, the rule that generated them lives here.`,
-		Example:     "  ga4-pp-cli event-create-rules --property-id 12345 --stream-id 9876 --agent",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Example: "  ga4-pp-cli event-create-rules --property-id 12345 --stream-id 9876 --agent",
+		// Hidden from agent-facing surface: stream-id 9876 is a placeholder
+		// that 404s on every real property. Still discoverable via --help.
+		Annotations: map[string]string{"mcp:read-only": "true", "mcp:hidden": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
 				return nil

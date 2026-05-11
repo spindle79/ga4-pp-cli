@@ -19,8 +19,10 @@ func newEnhancedMeasurementCmd(flags *rootFlags) *cobra.Command {
 		Aliases:     []string{"em", "auto-events"},
 		Short:       "Show the enhanced measurement (auto-event) settings for a GA4 data stream via the Admin API",
 		Long:        `Returns enhancedMeasurementSettings for the data stream — which automatic events GA4 collects (scrolls, outbound clicks, site search, video engagement, file downloads). When a report is missing one of these events, the toggle here is usually off.`,
-		Example:     "  ga4-pp-cli enhanced-measurement --property-id 12345 --stream-id 9876 --agent",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Example: "  ga4-pp-cli enhanced-measurement --property-id 12345 --stream-id 9876 --agent",
+		// Hidden from agent-facing surface: stream-id 9876 is a placeholder
+		// that 404s on every real property. Still discoverable via --help.
+		Annotations: map[string]string{"mcp:read-only": "true", "mcp:hidden": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
 				return nil

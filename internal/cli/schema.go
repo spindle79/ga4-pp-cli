@@ -196,7 +196,22 @@ the property.`,
 			}
 			sc, err := loadSchemaCache(prop)
 			if err != nil {
-				return fmt.Errorf("no cached schema for property %s: run `ga4-pp-cli schema fetch %s` first (%w)", prop, prop, err)
+				// Under --data-source auto, transparently fetch on first run so
+				// agents don't need to learn a two-step "fetch then list" recipe.
+				// We don't auto-fetch under --data-source local (offline by
+				// definition); --data-source live still falls back to fetch
+				// because the JSON cache is the only on-disk shape this command
+				// reads.
+				if flags == nil || flags.dataSource == "local" {
+					return fmt.Errorf("no cached schema for property %s: run `ga4-pp-cli schema fetch %s` first (%w)", prop, prop, err)
+				}
+				if ferr := fetchSchemaForProperty(cmd, flags, prop); ferr != nil {
+					return fmt.Errorf("auto-fetch schema for property %s: %w", prop, ferr)
+				}
+				sc, err = loadSchemaCache(prop)
+				if err != nil {
+					return fmt.Errorf("no cached schema for property %s after auto-fetch: %w", prop, err)
+				}
 			}
 			out := []schemaEntry{}
 			if kind == "" || kind == "dimension" || kind == "dimensions" {
@@ -338,6 +353,60 @@ func scoreTokens(tokens []string, e schemaEntry) int {
 		score += 2 // small boost: custom definitions are more specific to the user
 	}
 	return score
+}
+
+// fetchSchemaForProperty calls getMetadata for the given property and writes
+// the JSON cache that `schema list` / `schema search` read. Used by the
+// `schema list` auto-fetch path so agents don't need a separate `schema fetch`
+// invocation on a cold property cache. Mirrors the body of `schema fetch` but
+// without the user-facing summary print — auto-fetch should be silent.
+func fetchSchemaForProperty(cmd *cobra.Command, flags *rootFlags, prop string) error {
+	c, err := flags.newClient()
+	if err != nil {
+		return err
+	}
+	adapter := newClientAdapter(c)
+	data, err := adapter.get("/v1beta/properties/"+prop+"/metadata", nil)
+	if err != nil {
+		return classifyAPIError(err, flags)
+	}
+	var raw struct {
+		Dimensions []map[string]any `json:"dimensions"`
+		Metrics    []map[string]any `json:"metrics"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("parsing metadata: %w", err)
+	}
+	sc := &schemaCache{
+		Property:  prop,
+		FetchedAt: nowRFC3339(),
+	}
+	for _, d := range raw.Dimensions {
+		sc.Dimensions = append(sc.Dimensions, schemaEntry{
+			APIName:     str(d["apiName"]),
+			UIName:      str(d["uiName"]),
+			Description: str(d["description"]),
+			Category:    str(d["category"]),
+			Custom:      boolish(d["customDefinition"]),
+			Kind:        "dimension",
+		})
+	}
+	for _, m := range raw.Metrics {
+		sc.Metrics = append(sc.Metrics, schemaEntry{
+			APIName:     str(m["apiName"]),
+			UIName:      str(m["uiName"]),
+			Description: str(m["description"]),
+			Category:    str(m["category"]),
+			Custom:      boolish(m["customDefinition"]),
+			Kind:        "metric",
+		})
+	}
+	if err := saveSchemaCache(sc); err != nil {
+		return fmt.Errorf("saving cache: %w", err)
+	}
+	fmt.Fprintf(cmd.ErrOrStderr(), "WARN auto-fetched schema cache for property %s (%d dimensions, %d metrics)\n",
+		prop, len(sc.Dimensions), len(sc.Metrics))
+	return nil
 }
 
 // helpers

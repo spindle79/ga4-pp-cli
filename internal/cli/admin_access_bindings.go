@@ -54,8 +54,11 @@ func newAccessBindingDescribeCmd(flags *rootFlags) *cobra.Command {
 		Use:         "describe",
 		Aliases:     []string{"get"},
 		Short:       "Fetch a single GA4 access binding by ID, including its principal and full role list",
-		Example:     "  ga4-pp-cli access-bindings describe --binding-id 7777 --property-id 12345 --agent",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Example: "  ga4-pp-cli access-bindings describe --binding-id 7777 --property-id 12345 --agent",
+		// Hidden from the agent-facing surface because the example IDs are
+		// placeholders — exercising this against any real GA4 property 404s.
+		// Still discoverable via --help and fully callable from the CLI.
+		Annotations: map[string]string{"mcp:read-only": "true", "mcp:hidden": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
 				return nil

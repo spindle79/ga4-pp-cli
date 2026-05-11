@@ -374,6 +374,7 @@ func newTemplatesDeleteCmd(flags *rootFlags) *cobra.Command {
 		Use:     "delete <name>",
 		Aliases: []string{"rm"},
 		Short:   "Delete a saved template",
+		Example: "  ga4-pp-cli templates delete weekly-content --agent",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return cmd.Help()

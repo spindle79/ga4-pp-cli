@@ -10,9 +10,38 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
+
+// validatePagePath rejects obviously-invalid page-path positionals up front so
+// agents get a typed exit (rather than a silent API call that returns zero
+// rows). A real pagePath is a URL path that starts with "/", or — for the
+// non-EXACT match types — a regex / glob fragment that contains a path
+// separator. We deliberately err on the side of strict to keep accidental
+// shell-glob expansions and dogfood sentinels (e.g. "__printing_press_invalid__")
+// out of the report request.
+func validatePagePath(raw, matchType string) error {
+	p := strings.TrimSpace(raw)
+	if p == "" {
+		return fmt.Errorf("pagePath is required")
+	}
+	switch strings.ToUpper(matchType) {
+	case "FULL_REGEXP", "PARTIAL_REGEXP":
+		// Regex modes: any non-empty value is accepted, but require at least
+		// one path-shaped character so "abc" alone is still rejected.
+		if !strings.ContainsAny(p, "/^.*+?(") {
+			return fmt.Errorf("pagePath %q does not look like a URL path or regex", p)
+		}
+		return nil
+	default:
+		if !strings.HasPrefix(p, "/") {
+			return fmt.Errorf("pagePath %q must start with '/' (got %q)", p, p)
+		}
+		return nil
+	}
+}
 
 func newPagesCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
@@ -87,10 +116,11 @@ func newPagesViewsCmd(flags *rootFlags) *cobra.Command {
 		Aliases:     []string{"pageviews"},
 		Short:       "Page views for a path (matches spindle79 getUrlPageViews + arbitrary match types)",
 		Example:     "  ga4-pp-cli pages views /blog/launch --timeframe 7d --agent",
+		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmd.Help()
+			if err := validatePagePath(args[0], p.matchType); err != nil {
+				return err
 			}
 			if dryRunOK(flags) {
 				return nil
@@ -130,10 +160,11 @@ func newPagesEngagementCmd(flags *rootFlags) *cobra.Command {
 		Use:         "engagement <pagePath>",
 		Short:       "Engagement metrics for a path (bounceRate, engagedSessions, avg session duration, screenPageViewsPerSession)",
 		Example:     "  ga4-pp-cli pages engagement /pricing --timeframe last-week --agent",
+		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmd.Help()
+			if err := validatePagePath(args[0], p.matchType); err != nil {
+				return err
 			}
 			if dryRunOK(flags) {
 				return nil
@@ -171,10 +202,11 @@ func newPagesSourcesCmd(flags *rootFlags) *cobra.Command {
 		Aliases:     []string{"traffic-sources"},
 		Short:       "Traffic sources (source/medium) for a path",
 		Example:     "  ga4-pp-cli pages sources /home --timeframe 30d --limit 20 --agent",
+		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmd.Help()
+			if err := validatePagePath(args[0], p.matchType); err != nil {
+				return err
 			}
 			if dryRunOK(flags) {
 				return nil
@@ -219,10 +251,11 @@ func newPagesConversionsCmd(flags *rootFlags) *cobra.Command {
 		Use:         "conversions <pagePath>",
 		Short:       "Conversion events triggered on a path",
 		Example:     "  ga4-pp-cli pages conversions /signup --timeframe 28d --agent",
+		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmd.Help()
+			if err := validatePagePath(args[0], p.matchType); err != nil {
+				return err
 			}
 			if dryRunOK(flags) {
 				return nil
@@ -266,10 +299,11 @@ func newPagesAnalyticsCmd(flags *rootFlags) *cobra.Command {
 		Aliases:     []string{"all"},
 		Short:       "Combined views + engagement + sources + conversions in one batchRunReports call",
 		Example:     "  ga4-pp-cli pages analytics /landing --timeframe last-week --agent",
+		Args:        cobra.ExactArgs(1),
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				return cmd.Help()
+			if err := validatePagePath(args[0], p.matchType); err != nil {
+				return err
 			}
 			if dryRunOK(flags) {
 				return nil

@@ -13,6 +13,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strconv"
 	"time"
 
@@ -76,7 +77,17 @@ func newSyncAllCmd(flags *rootFlags) *cobra.Command {
 				default:
 					continue
 				}
-				if err := sub.RunE(cmd, args); err != nil {
+				// Swallow each sub-command's stdout so `sync all` emits exactly
+				// one JSON object (its own summary). Without this the three
+				// nested printOutputWithFlags calls concatenate three pretty-
+				// printed JSON documents to stdout and dogfood's JSON-fidelity
+				// check (single-object or NDJSON) fails on the result.
+				// SetOut applies to `sub`'s OutOrStdout, so we must pass `sub`
+				// to RunE (not the outer `cmd`) — Cobra resolves OutOrStdout
+				// off the receiver, not the lexical owner.
+				sub.SetOut(io.Discard)
+				sub.SetErr(cmd.ErrOrStderr())
+				if err := sub.RunE(sub, args); err != nil {
 					results[scope] = map[string]any{"error": err.Error()}
 					continue
 				}

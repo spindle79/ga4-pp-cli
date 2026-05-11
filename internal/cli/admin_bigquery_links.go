@@ -54,8 +54,10 @@ func newBigQueryLinkDescribeCmd(flags *rootFlags) *cobra.Command {
 		Use:         "describe",
 		Aliases:     []string{"get"},
 		Short:       "Fetch a single GA4 BigQuery link by ID, including export schedule and freshness metadata",
-		Example:     "  ga4-pp-cli bigquery-links describe --link-id abc123 --property-id 12345 --agent",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Example: "  ga4-pp-cli bigquery-links describe --link-id abc123 --property-id 12345 --agent",
+		// Hidden from agent-facing surface: example IDs are placeholders
+		// that 404 on every real property. Still discoverable via --help.
+		Annotations: map[string]string{"mcp:read-only": "true", "mcp:hidden": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
 				return nil

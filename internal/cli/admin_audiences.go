@@ -53,8 +53,10 @@ func newAudiencesDescribeCmd(flags *rootFlags) *cobra.Command {
 		Use:         "describe",
 		Aliases:     []string{"get"},
 		Short:       "Fetch a single GA4 audience by ID, including its filter expression and creation metadata",
-		Example:     "  ga4-pp-cli audiences describe --audience-id 123456 --property-id 12345 --agent",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Example: "  ga4-pp-cli audiences describe --audience-id 123456 --property-id 12345 --agent",
+		// Hidden from agent-facing surface: example IDs are placeholders
+		// that 404 on every real property. Still discoverable via --help.
+		Annotations: map[string]string{"mcp:read-only": "true", "mcp:hidden": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
 				return nil

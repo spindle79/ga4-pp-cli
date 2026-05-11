@@ -33,8 +33,8 @@ func newDriftPagesCmd(flags *rootFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pages",
 		Short: "Top page movers between two adjacent windows",
-		Example: `  ga4-pp-cli drift pages --window 7d --vs prior --top 20 --agent
-  ga4-pp-cli drift pages --window 30d --metric engagementRate --top 10 --agent`,
+		Example: `  ga4-pp-cli drift pages --window 7d --top 20 --agent
+  ga4-pp-cli drift pages --window 30d --metric screenPageViews --top 10 --agent`,
 		Annotations: map[string]string{"mcp:read-only": "true"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRunOK(flags) {
